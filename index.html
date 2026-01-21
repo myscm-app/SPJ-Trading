@@ -184,6 +184,118 @@
             );
         }
 
+        const RecapPage = ({ user }) => {
+            const [transactions, setTransactions] = useState([]);
+            const [filter, setFilter] = useState({ 
+                startDate: new Date().toISOString().split('T')[0], 
+                endDate: new Date().toISOString().split('T')[0] 
+            });
+
+            useEffect(() => {
+                if (!user) return;
+                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'));
+                const unsub = onSnapshot(q, s => {
+                    const data = s.docs.map(d => ({id: d.id, ...d.data()}));
+                    setTransactions(data.sort((a,b) => new Date(b.date) - new Date(a.date)));
+                });
+                return () => unsub();
+            }, [user]);
+
+            const filteredData = transactions.filter(t => {
+                return t.date >= filter.startDate && t.date <= filter.endDate;
+            });
+
+            const downloadExcel = () => {
+                if(filteredData.length === 0) return alert("Tidak ada data untuk didownload");
+
+                const dataForExcel = filteredData.map(row => ({
+                    "Tanggal": row.date,
+                    "No Polisi": row.nopol,
+                    "Driver": row.driver,
+                    "No HP": row.noHp || '-',
+                    "Customer": row.customerName,
+                    "Alamat Customer": row.customerAddress || '',
+                    "Barang": row.itemName,
+                    "Qty": Number(row.qty), 
+                    "Satuan": row.uom,
+                    "Status": row.status === 'COMPLETED' ? 'Selesai' : 'Dalam Perjalanan',
+                    "Keterangan": row.notes || ''
+                }));
+
+                const ws = window.XLSX.utils.json_to_sheet(dataForExcel);
+                const wscols = [
+                    {wch: 12}, {wch: 15}, {wch: 20}, {wch: 15}, 
+                    {wch: 25}, {wch: 40}, {wch: 20}, {wch: 10}, 
+                    {wch: 10}, {wch: 15}, {wch: 30}
+                ];
+                ws['!cols'] = wscols;
+                const wb = window.XLSX.utils.book_new();
+                window.XLSX.utils.book_append_sheet(wb, ws, "Rekap Transaksi");
+                window.XLSX.writeFile(wb, `Rekap_Transaksi_${filter.startDate}_sd_${filter.endDate}.xlsx`);
+            };
+
+            return React.createElement("div", { className: "space-y-6 no-print" },
+                React.createElement("div", { className: "bg-white p-6 rounded-xl border shadow-sm" },
+                    React.createElement("h2", { className: "font-bold mb-4 flex gap-2 items-center" }, 
+                        React.createElement(FileSpreadsheet, { className: "text-green-600" }), " Rekapitulasi Data"
+                    ),
+                    
+                    React.createElement("div", { className: "flex flex-col md:flex-row gap-4 items-end mb-6" },
+                        React.createElement("div", { className: "w-full" },
+                            React.createElement("label", { className: "text-xs font-bold text-slate-500" }, "DARI TANGGAL"),
+                            React.createElement("input", { type: "date", className: "w-full p-2 border rounded-lg", value: filter.startDate, onChange: e => setFilter({...filter, startDate: e.target.value}) })
+                        ),
+                        React.createElement("div", { className: "w-full" },
+                            React.createElement("label", { className: "text-xs font-bold text-slate-500" }, "SAMPAI TANGGAL"),
+                            React.createElement("input", { type: "date", className: "w-full p-2 border rounded-lg", value: filter.endDate, onChange: e => setFilter({...filter, endDate: e.target.value}) })
+                        ),
+                        React.createElement("button", { onClick: downloadExcel, className: "w-full md:w-auto bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-700 flex gap-2 items-center justify-center transition-all shadow-md active:scale-95" }, 
+                            React.createElement(Download, { size: 18 }), "Download .XLSX"
+                        )
+                    ),
+
+                    React.createElement("div", { className: "overflow-x-auto border rounded-lg" },
+                        React.createElement("table", { className: "w-full text-xs text-left" },
+                            React.createElement("thead", { className: "bg-slate-100 text-slate-600 uppercase font-bold" },
+                                React.createElement("tr", null,
+                                    React.createElement("th", { className: "p-3 border-b" }, "Tanggal"),
+                                    React.createElement("th", { className: "p-3 border-b" }, "Nopol"),
+                                    React.createElement("th", { className: "p-3 border-b" }, "Driver"),
+                                    React.createElement("th", { className: "p-3 border-b" }, "No HP"),
+                                    React.createElement("th", { className: "p-3 border-b" }, "Customer"),
+                                    React.createElement("th", { className: "p-3 border-b" }, "Barang"),
+                                    React.createElement("th", { className: "p-3 border-b text-right" }, "Qty"),
+                                    React.createElement("th", { className: "p-3 border-b" }, "Status"),
+                                    React.createElement("th", { className: "p-3 border-b" }, "Keterangan")
+                                )
+                            ),
+                            React.createElement("tbody", null,
+                                filteredData.length === 0 ? 
+                                React.createElement("tr", null, React.createElement("td", { colSpan: 9, className: "p-8 text-center text-slate-400" }, "Tidak ada data pada periode ini.")) :
+                                filteredData.map(row => 
+                                    React.createElement("tr", { key: row.id, className: "hover:bg-slate-50 border-b last:border-0" },
+                                        React.createElement("td", { className: "p-3" }, row.date),
+                                        React.createElement("td", { className: "p-3 font-bold" }, row.nopol),
+                                        React.createElement("td", { className: "p-3" }, row.driver),
+                                        React.createElement("td", { className: "p-3 text-slate-500" }, row.noHp || '-'),
+                                        React.createElement("td", { className: "p-3" }, row.customerName),
+                                        React.createElement("td", { className: "p-3" }, row.itemName),
+                                        React.createElement("td", { className: "p-3 text-right font-bold" }, `${row.qty} ${row.uom}`),
+                                        React.createElement("td", { className: "p-3" }, 
+                                            React.createElement("span", { className: `px-2 py-1 rounded text-[10px] font-bold ${row.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}` }, 
+                                                row.status
+                                            )
+                                        ),
+                                        React.createElement("td", { className: "p-3 italic text-slate-500 max-w-xs truncate" }, row.notes || '-')
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            );
+        };
+
         const TransactionForm = ({ user, trucks }) => {
             const [customers, setCustomers] = useState([]);
             const [items, setItems] = useState([]);
@@ -250,22 +362,24 @@
             const sendWhatsAppNotification = async (data) => {
                 if (!waConfig.token || !waConfig.targetGroups) return;
 
-                const message = `*Trading*
-🔔 LAPORAN TRANSAKSI KIRIMAN
-📅 Tgl        : ${data.date}
-🔄 Tipe       : Cetak SPJ
-👤 User       : Admin
+                const message = `Trading
+🔔 *LAPORAN TRANSAKSI KIRIMAN*
+📅 *Tgl* : ${data.date}
+🔄 *Tipe* : Cetak SPJ
+👤 *User* : Admin
 
-📄 No. POL  : ${data.nopol}
-${data.driver}
-${data.noHp}
-📍 Tujuan   : ${data.customerName}
+📄 *No. POL* : ${data.nopol}
+      *Driver* : ${data.driver}
+      *Tlp* : ${data.noHp}
+📍 *Tujuan* : ${data.customerName}
 
-Rincian Produk
+*Rincian Produk*
 --------------------------------
 1. ${data.itemName}
    📦 ${data.qty} ${data.uom}
-${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
+${data.notes ? `   📝 Ket: ${data.notes}` : ''}
+
+> _Sent via fonnte.com_`;
 
                 const groups = waConfig.targetGroups.split(',').map(g => g.trim()).filter(g => g);
 
@@ -575,118 +689,6 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
                         ),
                         t.status === 'ACTIVE' && React.createElement("button", { onClick: () => handleFinish(t.id), className: "bg-orange-500 text-white text-xs px-4 py-2 rounded-lg font-bold hover:bg-orange-600 transition-colors" }, "SELESAI")
                     ))
-            );
-        };
-
-        const RecapPage = ({ user }) => {
-            const [transactions, setTransactions] = useState([]);
-            const [filter, setFilter] = useState({ 
-                startDate: new Date().toISOString().split('T')[0], 
-                endDate: new Date().toISOString().split('T')[0] 
-            });
-
-            useEffect(() => {
-                if (!user) return;
-                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'));
-                const unsub = onSnapshot(q, s => {
-                    const data = s.docs.map(d => ({id: d.id, ...d.data()}));
-                    setTransactions(data.sort((a,b) => new Date(b.date) - new Date(a.date)));
-                });
-                return () => unsub();
-            }, [user]);
-
-            const filteredData = transactions.filter(t => {
-                return t.date >= filter.startDate && t.date <= filter.endDate;
-            });
-
-            const downloadExcel = () => {
-                if(filteredData.length === 0) return alert("Tidak ada data untuk didownload");
-
-                const dataForExcel = filteredData.map(row => ({
-                    "Tanggal": row.date,
-                    "No Polisi": row.nopol,
-                    "Driver": row.driver,
-                    "No HP": row.noHp || '-',
-                    "Customer": row.customerName,
-                    "Alamat Customer": row.customerAddress || '',
-                    "Barang": row.itemName,
-                    "Qty": Number(row.qty), 
-                    "Satuan": row.uom,
-                    "Status": row.status === 'COMPLETED' ? 'Selesai' : 'Dalam Perjalanan',
-                    "Keterangan": row.notes || ''
-                }));
-
-                const ws = window.XLSX.utils.json_to_sheet(dataForExcel);
-                const wscols = [
-                    {wch: 12}, {wch: 15}, {wch: 20}, {wch: 15}, 
-                    {wch: 25}, {wch: 40}, {wch: 20}, {wch: 10}, 
-                    {wch: 10}, {wch: 15}, {wch: 30}
-                ];
-                ws['!cols'] = wscols;
-                const wb = window.XLSX.utils.book_new();
-                window.XLSX.utils.book_append_sheet(wb, ws, "Rekap Transaksi");
-                window.XLSX.writeFile(wb, `Rekap_Transaksi_${filter.startDate}_sd_${filter.endDate}.xlsx`);
-            };
-
-            return React.createElement("div", { className: "space-y-6 no-print" },
-                React.createElement("div", { className: "bg-white p-6 rounded-xl border shadow-sm" },
-                    React.createElement("h2", { className: "font-bold mb-4 flex gap-2 items-center" }, 
-                        React.createElement(FileSpreadsheet, { className: "text-green-600" }), " Rekapitulasi Data"
-                    ),
-                    
-                    React.createElement("div", { className: "flex flex-col md:flex-row gap-4 items-end mb-6" },
-                        React.createElement("div", { className: "w-full" },
-                            React.createElement("label", { className: "text-xs font-bold text-slate-500" }, "DARI TANGGAL"),
-                            React.createElement("input", { type: "date", className: "w-full p-2 border rounded-lg", value: filter.startDate, onChange: e => setFilter({...filter, startDate: e.target.value}) })
-                        ),
-                        React.createElement("div", { className: "w-full" },
-                            React.createElement("label", { className: "text-xs font-bold text-slate-500" }, "SAMPAI TANGGAL"),
-                            React.createElement("input", { type: "date", className: "w-full p-2 border rounded-lg", value: filter.endDate, onChange: e => setFilter({...filter, endDate: e.target.value}) })
-                        ),
-                        React.createElement("button", { onClick: downloadExcel, className: "w-full md:w-auto bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-700 flex gap-2 items-center justify-center transition-all shadow-md active:scale-95" }, 
-                            React.createElement(Download, { size: 18 }), "Download .XLSX"
-                        )
-                    ),
-
-                    React.createElement("div", { className: "overflow-x-auto border rounded-lg" },
-                        React.createElement("table", { className: "w-full text-xs text-left" },
-                            React.createElement("thead", { className: "bg-slate-100 text-slate-600 uppercase font-bold" },
-                                React.createElement("tr", null,
-                                    React.createElement("th", { className: "p-3 border-b" }, "Tanggal"),
-                                    React.createElement("th", { className: "p-3 border-b" }, "Nopol"),
-                                    React.createElement("th", { className: "p-3 border-b" }, "Driver"),
-                                    React.createElement("th", { className: "p-3 border-b" }, "No HP"),
-                                    React.createElement("th", { className: "p-3 border-b" }, "Customer"),
-                                    React.createElement("th", { className: "p-3 border-b" }, "Barang"),
-                                    React.createElement("th", { className: "p-3 border-b text-right" }, "Qty"),
-                                    React.createElement("th", { className: "p-3 border-b" }, "Status"),
-                                    React.createElement("th", { className: "p-3 border-b" }, "Keterangan")
-                                )
-                            ),
-                            React.createElement("tbody", null,
-                                filteredData.length === 0 ? 
-                                React.createElement("tr", null, React.createElement("td", { colSpan: 9, className: "p-8 text-center text-slate-400" }, "Tidak ada data pada periode ini.")) :
-                                filteredData.map(row => 
-                                    React.createElement("tr", { key: row.id, className: "hover:bg-slate-50 border-b last:border-0" },
-                                        React.createElement("td", { className: "p-3" }, row.date),
-                                        React.createElement("td", { className: "p-3 font-bold" }, row.nopol),
-                                        React.createElement("td", { className: "p-3" }, row.driver),
-                                        React.createElement("td", { className: "p-3 text-slate-500" }, row.noHp || '-'),
-                                        React.createElement("td", { className: "p-3" }, row.customerName),
-                                        React.createElement("td", { className: "p-3" }, row.itemName),
-                                        React.createElement("td", { className: "p-3 text-right font-bold" }, `${row.qty} ${row.uom}`),
-                                        React.createElement("td", { className: "p-3" }, 
-                                            React.createElement("span", { className: `px-2 py-1 rounded text-[10px] font-bold ${row.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}` }, 
-                                                row.status
-                                            )
-                                        ),
-                                        React.createElement("td", { className: "p-3 italic text-slate-500 max-w-xs truncate" }, row.notes || '-')
-                                    )
-                                )
-                            )
-                        )
-                    )
-                )
             );
         };
 
