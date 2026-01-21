@@ -546,160 +546,35 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
             );
         };
 
-        const SettingsPage = ({ user }) => {
-            const [isAuthenticated, setIsAuthenticated] = useState(false);
-            const [loginData, setLoginData] = useState({ username: '', password: '' });
-            const [activeTab, setActiveTab] = useState('general');
-            const [coords, setCoords] = useState(DEFAULT_COORDS);
-            const [waConfig, setWaConfig] = useState({ token: '', targetGroups: '' });
-            const [loading, setLoading] = useState(false);
-
+        const TransactionHistory = ({ user }) => {
+            const [transactions, setTransactions] = useState([]);
             useEffect(() => {
                 if (!user) return;
-                const loadSettings = async () => {
-                    const snap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'global'));
-                    if (snap.exists()) {
-                        const data = snap.data();
-                        if(data.printConfig) setCoords(data.printConfig);
-                        if(data.waConfig) setWaConfig(data.waConfig);
-                    }
-                };
-                loadSettings();
+                const unsub = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'transactions')), s => {
+                    const data = s.docs.map(d => ({id: d.id, ...d.data()}));
+                    setTransactions(data.sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0)));
+                }, (err) => console.error(err));
+                return () => unsub();
             }, [user]);
 
-            const handleLogin = (e) => {
-                e.preventDefault();
-                if (loginData.username === 'admin' && loginData.password === 'admin123') {
-                    setIsAuthenticated(true);
-                } else {
-                    alert("Username atau Password salah!");
-                }
+            const handleFinish = async (id) => {
+                if(!confirm("Selesaikan transaksi ini? Armada akan kembali tersedia.")) return;
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', id), { status: 'COMPLETED', completedAt: serverTimestamp() });
             };
 
-            if (!isAuthenticated) {
-                return React.createElement("div", { className: "max-w-md mx-auto mt-10 bg-white p-8 rounded-xl border shadow-sm" },
-                    React.createElement("h2", { className: "text-xl font-bold text-center mb-6 flex items-center justify-center gap-2" }, 
-                        React.createElement(Settings, { className: "text-blue-500" }), "Akses Pengaturan"
-                    ),
-                    React.createElement("form", { onSubmit: handleLogin, className: "space-y-4" },
+            return React.createElement("div", { className: "space-y-3 no-print" },
+                React.createElement("h2", { className: "font-bold text-lg flex gap-2 items-center" }, React.createElement(History, { className: "text-blue-500" }), " Log Perjalanan / Transaksi"),
+                transactions.length === 0 ? 
+                    React.createElement("p", {className: "text-center text-slate-400 py-10"}, "Belum ada riwayat transaksi.") :
+                    transactions.map(t => React.createElement("div", { key: t.id, className: `bg-white p-4 rounded-xl border shadow-sm flex justify-between items-center ${t.status === 'ACTIVE' ? 'border-l-4 border-l-orange-500' : 'opacity-60'}` },
                         React.createElement("div", null,
-                            React.createElement("label", { className: "block text-sm font-bold text-slate-500 mb-1" }, "Username"),
-                            React.createElement("input", { 
-                                type: "text", 
-                                className: "w-full p-2 border rounded-lg",
-                                value: loginData.username,
-                                onChange: e => setLoginData({...loginData, username: e.target.value})
-                            })
+                            React.createElement("p", { className: "font-black text-lg" }, t.nopol),
+                            React.createElement("p", { className: "text-sm font-bold text-slate-600" }, t.customerName),
+                            React.createElement("p", { className: "text-xs text-blue-600" }, t.itemName, " - ", t.qty, " ", t.uom),
+                            t.notes && React.createElement("p", { className: "text-[10px] text-slate-400 italic" }, "Ket: ", t.notes)
                         ),
-                        React.createElement("div", null,
-                            React.createElement("label", { className: "block text-sm font-bold text-slate-500 mb-1" }, "Password"),
-                            React.createElement("input", { 
-                                type: "password", 
-                                className: "w-full p-2 border rounded-lg",
-                                value: loginData.password,
-                                onChange: e => setLoginData({...loginData, password: e.target.value})
-                            })
-                        ),
-                        React.createElement("button", { className: "w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700" }, "Masuk")
-                    )
-                );
-            }
-
-            const saveSettings = async () => {
-                setLoading(true);
-                try {
-                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'global'), {
-                        printConfig: coords,
-                        waConfig: waConfig,
-                        updatedAt: serverTimestamp()
-                    }, { merge: true });
-                    alert("Pengaturan Berhasil Disimpan!");
-                } catch (err) {
-                    console.error(err);
-                    alert("Gagal menyimpan");
-                }
-                setLoading(false);
-            };
-
-            return React.createElement("div", { className: "bg-white p-6 rounded-xl border shadow-sm no-print space-y-6" },
-                React.createElement("h2", { className: "text-lg font-bold flex items-center gap-2 border-b pb-4" }, 
-                    React.createElement(Settings, { className: "text-blue-500" }), " Pengaturan Aplikasi"
-                ),
-                
-                React.createElement("div", { className: "flex gap-2 border-b" },
-                    React.createElement("button", { onClick: () => setActiveTab('general'), className: `px-4 py-2 border-b-2 font-bold ${activeTab === 'general' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-400'}` }, "Umum"),
-                    React.createElement("button", { onClick: () => setActiveTab('wa'), className: `px-4 py-2 border-b-2 font-bold ${activeTab === 'wa' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-400'}` }, "WhatsApp"),
-                    React.createElement("button", { onClick: () => setActiveTab('print'), className: `px-4 py-2 border-b-2 font-bold ${activeTab === 'print' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-400'}` }, "Kalibrasi Cetak")
-                ),
-
-                activeTab === 'general' && React.createElement("div", { className: "text-center py-8" },
-                    React.createElement(TrendingUp, { className: "text-blue-200 mx-auto mb-4", size: 48 }),
-                    React.createElement("h3", {className: "font-bold text-lg"}, "My Trading v1.2"),
-                    React.createElement("p", { className: "text-slate-500 text-sm" }, "Sistem Manajemen Transaksi & Logistik Terpadu")
-                ),
-
-                activeTab === 'wa' && React.createElement("div", { className: "space-y-4" },
-                    React.createElement("div", { className: "bg-yellow-50 p-3 rounded-lg border border-yellow-200 text-xs text-yellow-800" }, 
-                        "Sistem menggunakan API Fonnte untuk mengirim notifikasi WhatsApp. Pastikan token aktif."
-                    ),
-                    React.createElement("div", null,
-                        React.createElement("label", { className: "block text-xs font-bold text-slate-500 mb-1" }, "TOKEN FONNTE"),
-                        React.createElement("input", { 
-                            type: "text", 
-                            placeholder: "Masukkan Token Fonnte...", 
-                            className: "w-full p-2 border rounded-lg",
-                            value: waConfig.token,
-                            onChange: e => setWaConfig({...waConfig, token: e.target.value})
-                        })
-                    ),
-                    React.createElement("div", null,
-                        React.createElement("label", { className: "block text-xs font-bold text-slate-500 mb-1" }, "ID GROUP WHATSAPP (Pisahkan koma jika > 1)"),
-                        React.createElement("input", { 
-                            type: "text", 
-                            placeholder: "1203630234@g.us, 1203630999@g.us", 
-                            className: "w-full p-2 border rounded-lg",
-                            value: waConfig.targetGroups,
-                            onChange: e => setWaConfig({...waConfig, targetGroups: e.target.value})
-                        })
-                    ),
-                    React.createElement("button", { onClick: saveSettings, disabled: loading, className: "bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50" }, 
-                        loading ? "Menyimpan..." : "Simpan Konfigurasi WA"
-                    )
-                ),
-
-                activeTab === 'print' && React.createElement("div", { className: "space-y-4" },
-                    React.createElement("p", { className: "text-sm text-slate-500" }, "Atur koordinat (dalam milimeter) untuk posisi cetak pada blangko kosong."),
-                    React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4" },
-                        Object.entries(coords).map(([key, val]) => 
-                            React.createElement("div", { key: key, className: "border p-3 rounded-lg bg-slate-50" },
-                                React.createElement("p", { className: "font-bold text-sm mb-2" }, val.label),
-                                React.createElement("div", { className: "flex gap-2" },
-                                    React.createElement("div", { className: "flex-1" },
-                                        React.createElement("label", { className: "text-[10px] text-slate-400 block" }, "ATAS (Y) mm"),
-                                        React.createElement("input", { 
-                                            type: "number", 
-                                            className: "w-full p-1 border rounded", 
-                                            value: val.top,
-                                            onChange: e => setCoords({ ...coords, [key]: { ...val, top: Number(e.target.value) } })
-                                        })
-                                    ),
-                                    React.createElement("div", { className: "flex-1" },
-                                        React.createElement("label", { className: "text-[10px] text-slate-400 block" }, "KIRI (X) mm"),
-                                        React.createElement("input", { 
-                                            type: "number", 
-                                            className: "w-full p-1 border rounded", 
-                                            value: val.left,
-                                            onChange: e => setCoords({ ...coords, [key]: { ...val, left: Number(e.target.value) } })
-                                        })
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    React.createElement("button", { onClick: saveSettings, disabled: loading, className: "bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 mt-4" }, 
-                        loading ? "Menyimpan..." : "Simpan Koordinat"
-                    )
-                )
+                        t.status === 'ACTIVE' && React.createElement("button", { onClick: () => handleFinish(t.id), className: "bg-orange-500 text-white text-xs px-4 py-2 rounded-lg font-bold hover:bg-orange-600 transition-colors" }, "SELESAI")
+                    ))
             );
         };
 
@@ -812,38 +687,6 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
                         )
                     )
                 )
-            );
-        };
-
-        const TransactionHistory = ({ user }) => {
-            const [transactions, setTransactions] = useState([]);
-            useEffect(() => {
-                if (!user) return;
-                const unsub = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'transactions')), s => {
-                    const data = s.docs.map(d => ({id: d.id, ...d.data()}));
-                    setTransactions(data.sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0)));
-                }, (err) => console.error(err));
-                return () => unsub();
-            }, [user]);
-
-            const handleFinish = async (id) => {
-                if(!confirm("Selesaikan transaksi ini? Armada akan kembali tersedia.")) return;
-                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', id), { status: 'COMPLETED', completedAt: serverTimestamp() });
-            };
-
-            return React.createElement("div", { className: "space-y-3 no-print" },
-                React.createElement("h2", { className: "font-bold text-lg flex gap-2 items-center" }, React.createElement(History, { className: "text-blue-500" }), " Log Perjalanan / Transaksi"),
-                transactions.length === 0 ? 
-                    React.createElement("p", {className: "text-center text-slate-400 py-10"}, "Belum ada riwayat transaksi.") :
-                    transactions.map(t => React.createElement("div", { key: t.id, className: `bg-white p-4 rounded-xl border shadow-sm flex justify-between items-center ${t.status === 'ACTIVE' ? 'border-l-4 border-l-orange-500' : 'opacity-60'}` },
-                        React.createElement("div", null,
-                            React.createElement("p", { className: "font-black text-lg" }, t.nopol),
-                            React.createElement("p", { className: "text-sm font-bold text-slate-600" }, t.customerName),
-                            React.createElement("p", { className: "text-xs text-blue-600" }, t.itemName, " - ", t.qty, " ", t.uom),
-                            t.notes && React.createElement("p", { className: "text-[10px] text-slate-400 italic" }, "Ket: ", t.notes)
-                        ),
-                        t.status === 'ACTIVE' && React.createElement("button", { onClick: () => handleFinish(t.id), className: "bg-orange-500 text-white text-xs px-4 py-2 rounded-lg font-bold hover:bg-orange-600 transition-colors" }, "SELESAI")
-                    ))
             );
         };
 
@@ -1145,6 +988,163 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
                                 )
                             )
                         )
+                    )
+                )
+            );
+        };
+
+        const SettingsPage = ({ user }) => {
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [loginData, setLoginData] = useState({ username: '', password: '' });
+            const [activeTab, setActiveTab] = useState('general');
+            const [coords, setCoords] = useState(DEFAULT_COORDS);
+            const [waConfig, setWaConfig] = useState({ token: '', targetGroups: '' });
+            const [loading, setLoading] = useState(false);
+
+            useEffect(() => {
+                if (!user) return;
+                const loadSettings = async () => {
+                    const snap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'global'));
+                    if (snap.exists()) {
+                        const data = snap.data();
+                        if(data.printConfig) setCoords(data.printConfig);
+                        if(data.waConfig) setWaConfig(data.waConfig);
+                    }
+                };
+                loadSettings();
+            }, [user]);
+
+            const handleLogin = (e) => {
+                e.preventDefault();
+                if (loginData.username === 'admin' && loginData.password === 'admin123') {
+                    setIsAuthenticated(true);
+                } else {
+                    alert("Username atau Password salah!");
+                }
+            };
+
+            if (!isAuthenticated) {
+                return React.createElement("div", { className: "max-w-md mx-auto mt-10 bg-white p-8 rounded-xl border shadow-sm" },
+                    React.createElement("h2", { className: "text-xl font-bold text-center mb-6 flex items-center justify-center gap-2" }, 
+                        React.createElement(Settings, { className: "text-blue-500" }), "Akses Pengaturan"
+                    ),
+                    React.createElement("form", { onSubmit: handleLogin, className: "space-y-4" },
+                        React.createElement("div", null,
+                            React.createElement("label", { className: "block text-sm font-bold text-slate-500 mb-1" }, "Username"),
+                            React.createElement("input", { 
+                                type: "text", 
+                                className: "w-full p-2 border rounded-lg",
+                                value: loginData.username,
+                                onChange: e => setLoginData({...loginData, username: e.target.value})
+                            })
+                        ),
+                        React.createElement("div", null,
+                            React.createElement("label", { className: "block text-sm font-bold text-slate-500 mb-1" }, "Password"),
+                            React.createElement("input", { 
+                                type: "password", 
+                                className: "w-full p-2 border rounded-lg",
+                                value: loginData.password,
+                                onChange: e => setLoginData({...loginData, password: e.target.value})
+                            })
+                        ),
+                        React.createElement("button", { className: "w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700" }, "Masuk")
+                    )
+                );
+            }
+
+            const saveSettings = async () => {
+                setLoading(true);
+                try {
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'global'), {
+                        printConfig: coords,
+                        waConfig: waConfig,
+                        updatedAt: serverTimestamp()
+                    }, { merge: true });
+                    alert("Pengaturan Berhasil Disimpan!");
+                } catch (err) {
+                    console.error(err);
+                    alert("Gagal menyimpan");
+                }
+                setLoading(false);
+            };
+
+            return React.createElement("div", { className: "bg-white p-6 rounded-xl border shadow-sm no-print space-y-6" },
+                React.createElement("h2", { className: "text-lg font-bold flex items-center gap-2 border-b pb-4" }, 
+                    React.createElement(Settings, { className: "text-blue-500" }), " Pengaturan Aplikasi"
+                ),
+                
+                React.createElement("div", { className: "flex gap-2 border-b" },
+                    React.createElement("button", { onClick: () => setActiveTab('general'), className: `px-4 py-2 border-b-2 font-bold ${activeTab === 'general' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-400'}` }, "Umum"),
+                    React.createElement("button", { onClick: () => setActiveTab('wa'), className: `px-4 py-2 border-b-2 font-bold ${activeTab === 'wa' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-400'}` }, "WhatsApp"),
+                    React.createElement("button", { onClick: () => setActiveTab('print'), className: `px-4 py-2 border-b-2 font-bold ${activeTab === 'print' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-400'}` }, "Kalibrasi Cetak")
+                ),
+
+                activeTab === 'general' && React.createElement("div", { className: "text-center py-8" },
+                    React.createElement(TrendingUp, { className: "text-blue-200 mx-auto mb-4", size: 48 }),
+                    React.createElement("h3", {className: "font-bold text-lg"}, "My Trading v1.2"),
+                    React.createElement("p", { className: "text-slate-500 text-sm" }, "Sistem Manajemen Transaksi & Logistik Terpadu")
+                ),
+
+                activeTab === 'wa' && React.createElement("div", { className: "space-y-4" },
+                    React.createElement("div", { className: "bg-yellow-50 p-3 rounded-lg border border-yellow-200 text-xs text-yellow-800" }, 
+                        "Sistem menggunakan API Fonnte untuk mengirim notifikasi WhatsApp. Pastikan token aktif."
+                    ),
+                    React.createElement("div", null,
+                        React.createElement("label", { className: "block text-xs font-bold text-slate-500 mb-1" }, "TOKEN FONNTE"),
+                        React.createElement("input", { 
+                            type: "text", 
+                            placeholder: "Masukkan Token Fonnte...", 
+                            className: "w-full p-2 border rounded-lg",
+                            value: waConfig.token,
+                            onChange: e => setWaConfig({...waConfig, token: e.target.value})
+                        })
+                    ),
+                    React.createElement("div", null,
+                        React.createElement("label", { className: "block text-xs font-bold text-slate-500 mb-1" }, "ID GROUP WHATSAPP (Pisahkan koma jika > 1)"),
+                        React.createElement("input", { 
+                            type: "text", 
+                            placeholder: "1203630234@g.us, 1203630999@g.us", 
+                            className: "w-full p-2 border rounded-lg",
+                            value: waConfig.targetGroups,
+                            onChange: e => setWaConfig({...waConfig, targetGroups: e.target.value})
+                        })
+                    ),
+                    React.createElement("button", { onClick: saveSettings, disabled: loading, className: "bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50" }, 
+                        loading ? "Menyimpan..." : "Simpan Konfigurasi WA"
+                    )
+                ),
+
+                activeTab === 'print' && React.createElement("div", { className: "space-y-4" },
+                    React.createElement("p", { className: "text-sm text-slate-500" }, "Atur koordinat (dalam milimeter) untuk posisi cetak pada blangko kosong."),
+                    React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4" },
+                        Object.entries(coords).map(([key, val]) => 
+                            React.createElement("div", { key: key, className: "border p-3 rounded-lg bg-slate-50" },
+                                React.createElement("p", { className: "font-bold text-sm mb-2" }, val.label),
+                                React.createElement("div", { className: "flex gap-2" },
+                                    React.createElement("div", { className: "flex-1" },
+                                        React.createElement("label", { className: "text-[10px] text-slate-400 block" }, "ATAS (Y) mm"),
+                                        React.createElement("input", { 
+                                            type: "number", 
+                                            className: "w-full p-1 border rounded", 
+                                            value: val.top,
+                                            onChange: e => setCoords({ ...coords, [key]: { ...val, top: Number(e.target.value) } })
+                                        })
+                                    ),
+                                    React.createElement("div", { className: "flex-1" },
+                                        React.createElement("label", { className: "text-[10px] text-slate-400 block" }, "KIRI (X) mm"),
+                                        React.createElement("input", { 
+                                            type: "number", 
+                                            className: "w-full p-1 border rounded", 
+                                            value: val.left,
+                                            onChange: e => setCoords({ ...coords, [key]: { ...val, left: Number(e.target.value) } })
+                                        })
+                                    )
+                                )
+                            )
+                        )
+                    ),
+                    React.createElement("button", { onClick: saveSettings, disabled: loading, className: "bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 mt-4" }, 
+                        loading ? "Menyimpan..." : "Simpan Koordinat"
                     )
                 )
             );
