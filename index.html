@@ -69,12 +69,12 @@
             Truck, ClipboardList, CheckCircle, PlusCircle, User, Phone, 
             Box, Search, History, Settings, Save, AlertCircle, Users, 
             Package, Printer, Calendar, FileText, X, Eye, AlignJustify, 
-            TrendingUp, MessageSquare, Pencil, Trash2, FileSpreadsheet, Download, Send, Lock, Info
+            TrendingUp, MessageSquare, Pencil, Trash2, FileSpreadsheet, Download, Send, Lock, Info, AlertTriangle
         } from 'lucide-react';
         
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Konfigurasi Firebase
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
@@ -686,6 +686,16 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
                 await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', id), { status: 'COMPLETED', completedAt: serverTimestamp() });
             };
 
+            const handleDelete = async (id) => {
+                if(!confirm("PERINGATAN: Data transaksi akan dihapus permanen dan tidak bisa dikembalikan. Lanjutkan?")) return;
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', id));
+                } catch (err) {
+                    console.error("Gagal menghapus:", err);
+                    alert("Gagal menghapus data.");
+                }
+            };
+
             return React.createElement("div", { className: "space-y-3 no-print" },
                 React.createElement("h2", { className: "font-bold text-lg flex gap-2 items-center" }, React.createElement(History, { className: "text-blue-500" }), " Log Perjalanan / Transaksi"),
                 transactions.length === 0 ? 
@@ -697,7 +707,12 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
                             React.createElement("p", { className: "text-xs text-blue-600" }, t.itemName, " - ", t.qty, " ", t.uom),
                             t.notes && React.createElement("p", { className: "text-[10px] text-slate-400 italic" }, "Ket: ", t.notes)
                         ),
-                        t.status === 'ACTIVE' && React.createElement("button", { onClick: () => handleFinish(t.id), className: "bg-orange-500 text-white text-xs px-4 py-2 rounded-lg font-bold hover:bg-orange-600 transition-colors" }, "SELESAI")
+                        React.createElement("div", { className: "flex items-center gap-2" },
+                            t.status === 'ACTIVE' && React.createElement("button", { onClick: () => handleFinish(t.id), className: "bg-orange-500 text-white text-xs px-4 py-2 rounded-lg font-bold hover:bg-orange-600 transition-colors" }, "SELESAI"),
+                            React.createElement("button", { onClick: () => handleDelete(t.id), className: "p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors", title: "Hapus Permanen" }, 
+                                React.createElement(Trash2, { size: 18 })
+                            )
+                        )
                     ))
             );
         };
@@ -1017,6 +1032,7 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
             const [coords, setCoords] = useState(DEFAULT_COORDS);
             const [waConfig, setWaConfig] = useState({ token: '', targetGroups: '' });
             const [loading, setLoading] = useState(false);
+            const [isResetting, setIsResetting] = useState(false);
 
             useEffect(() => {
                 if (!user) return;
@@ -1039,6 +1055,55 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
                     alert("Username atau Password salah!");
                 }
             };
+
+            // RESET LOGIC
+            const handleResetTransactions = async () => {
+                if (!confirm("PERINGATAN KERAS:\nAnda akan menghapus SEMUA DATA RIWAYAT TRANSAKSI.\nData yang dihapus TIDAK BISA DIKEMBALIKAN.\n\nKlik OK jika Anda yakin.")) return;
+                if (!confirm("Apakah Anda benar-benar yakin ingin mengosongkan data transaksi?")) return;
+
+                setIsResetting(true);
+                try {
+                    const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'));
+                    const snapshot = await getDocs(q); 
+                    const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+                    await Promise.all(deletePromises);
+                    alert("Semua data transaksi berhasil dihapus.");
+                } catch (error) {
+                    console.error("Error resetting transactions:", error);
+                    alert("Gagal menghapus data: " + error.message);
+                }
+                setIsResetting(false);
+            };
+
+            const handleResetMasterData = async () => {
+                 if (!confirm("PERINGATAN KERAS:\nAnda akan menghapus SEMUA DATA MASTER (Customer, Barang, Armada).\nAnda harus menginput ulang data dari awal.\n\nLanjutkan?")) return;
+                 if (!confirm("Yakin hapus Master Data?")) return;
+
+                 setIsResetting(true);
+                 try {
+                    // Customers
+                    const qC = query(collection(db, 'artifacts', appId, 'public', 'data', 'customers'));
+                    const sC = await getDocs(qC);
+                    const pC = sC.docs.map(d => deleteDoc(d.ref));
+
+                    // Items
+                    const qI = query(collection(db, 'artifacts', appId, 'public', 'data', 'items'));
+                    const sI = await getDocs(qI);
+                    const pI = sI.docs.map(d => deleteDoc(d.ref));
+
+                    // Trucks
+                    const qT = query(collection(db, 'artifacts', appId, 'public', 'data', 'trucks'));
+                    const sT = await getDocs(qT);
+                    const pT = sT.docs.map(d => deleteDoc(d.ref));
+
+                    await Promise.all([...pC, ...pI, ...pT]);
+                    alert("Semua master data berhasil dihapus.");
+                 } catch (error) {
+                     console.error(error);
+                     alert("Gagal reset master data.");
+                 }
+                 setIsResetting(false);
+            }
 
             if (!isAuthenticated) {
                 return React.createElement("div", { className: "w-11/12 max-w-md mx-auto mt-10 bg-white p-6 md:p-8 rounded-xl border shadow-sm" },
@@ -1093,7 +1158,8 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
                 React.createElement("div", { className: "flex gap-2 border-b overflow-x-auto hide-scrollbar" },
                     React.createElement("button", { onClick: () => setActiveTab('general'), className: `px-4 py-2 border-b-2 font-bold whitespace-nowrap ${activeTab === 'general' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-400'}` }, "Umum"),
                     React.createElement("button", { onClick: () => setActiveTab('wa'), className: `px-4 py-2 border-b-2 font-bold whitespace-nowrap ${activeTab === 'wa' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-400'}` }, "WhatsApp"),
-                    React.createElement("button", { onClick: () => setActiveTab('print'), className: `px-4 py-2 border-b-2 font-bold whitespace-nowrap ${activeTab === 'print' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-400'}` }, "Kalibrasi Cetak")
+                    React.createElement("button", { onClick: () => setActiveTab('print'), className: `px-4 py-2 border-b-2 font-bold whitespace-nowrap ${activeTab === 'print' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-400'}` }, "Kalibrasi Cetak"),
+                    React.createElement("button", { onClick: () => setActiveTab('reset'), className: `px-4 py-2 border-b-2 font-bold whitespace-nowrap ${activeTab === 'reset' ? 'border-red-500 text-red-600' : 'border-transparent text-slate-400'}` }, "Reset Data")
                 ),
 
                 activeTab === 'general' && React.createElement("div", { className: "text-center py-8" },
@@ -1162,6 +1228,45 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
                     ),
                     React.createElement("button", { onClick: saveSettings, disabled: loading, className: "bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 mt-4 w-full md:w-auto" }, 
                         loading ? "Menyimpan..." : "Simpan Koordinat"
+                    )
+                ),
+
+                // RESET DATA TAB
+                activeTab === 'reset' && React.createElement("div", { className: "space-y-6" },
+                    React.createElement("div", { className: "bg-red-50 border border-red-200 p-4 rounded-lg flex gap-3 items-start" },
+                        React.createElement(AlertTriangle, { className: "text-red-600 shrink-0 mt-1" }),
+                        React.createElement("div", null,
+                            React.createElement("h3", { className: "font-bold text-red-800" }, "Zona Bahaya (Danger Zone)"),
+                            React.createElement("p", { className: "text-sm text-red-700 mt-1" }, 
+                                "Tindakan di halaman ini bersifat destruktif dan tidak dapat dibatalkan. Data yang dihapus akan hilang selamanya."
+                            )
+                        )
+                    ),
+
+                    React.createElement("div", { className: "space-y-4" },
+                        React.createElement("div", { className: "border p-4 rounded-lg flex flex-col md:flex-row justify-between items-center gap-4 bg-white" },
+                            React.createElement("div", null,
+                                React.createElement("h4", { className: "font-bold" }, "Reset Data Transaksi"),
+                                React.createElement("p", { className: "text-xs text-slate-500" }, "Menghapus semua riwayat transaksi pengiriman. Data Customer, Barang, & Armada TETAP ADA.")
+                            ),
+                            React.createElement("button", { 
+                                onClick: handleResetTransactions, 
+                                disabled: isResetting,
+                                className: "bg-red-100 text-red-700 px-4 py-2 rounded-lg font-bold hover:bg-red-200 border border-red-200 whitespace-nowrap disabled:opacity-50" 
+                            }, isResetting ? "Memproses..." : "Hapus Semua Transaksi")
+                        ),
+
+                        React.createElement("div", { className: "border p-4 rounded-lg flex flex-col md:flex-row justify-between items-center gap-4 bg-white" },
+                            React.createElement("div", null,
+                                React.createElement("h4", { className: "font-bold" }, "Reset Master Data (Total Reset)"),
+                                React.createElement("p", { className: "text-xs text-slate-500" }, "Menghapus Customer, Barang, dan Armada. Aplikasi akan menjadi kosong melompong.")
+                            ),
+                            React.createElement("button", { 
+                                onClick: handleResetMasterData, 
+                                disabled: isResetting,
+                                className: "bg-slate-100 text-slate-700 px-4 py-2 rounded-lg font-bold hover:bg-slate-200 border border-slate-300 whitespace-nowrap disabled:opacity-50" 
+                            }, isResetting ? "Memproses..." : "Hapus Master Data")
+                        )
                     )
                 )
             );
