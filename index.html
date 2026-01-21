@@ -69,7 +69,7 @@
             Truck, ClipboardList, CheckCircle, PlusCircle, User, Phone, 
             Box, Search, History, Settings, Save, AlertCircle, Users, 
             Package, Printer, Calendar, FileText, X, Eye, AlignJustify, 
-            TrendingUp, MessageSquare, Pencil, Trash2, FileSpreadsheet, Download, Send, Lock
+            TrendingUp, MessageSquare, Pencil, Trash2, FileSpreadsheet, Download, Send, Lock, Info
         } from 'lucide-react';
         
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -106,7 +106,95 @@
             driver: { top: 125, left: 75, label: 'Nama Driver' }
         };
 
-        // --- DEFINISI KOMPONEN ANAK (Didefinisikan SEBELUM App) ---
+        // --- DEFINISI KOMPONEN ANAK ---
+
+        // HALAMAN INSTRUKSI KERJA (PANDUAN)
+        const InstructionPage = () => {
+            return React.createElement("div", { className: "space-y-6 pb-20 no-print" },
+                // Header
+                React.createElement("div", { className: "bg-white p-6 rounded-xl border shadow-sm" },
+                    React.createElement("h2", { className: "text-xl font-bold mb-2 flex items-center gap-2" },
+                        React.createElement(Info, { className: "text-blue-600" }), " Instruksi Kerja (SOP)"
+                    ),
+                    React.createElement("p", { className: "text-sm text-slate-600" },
+                        "Panduan standar operasional untuk penggunaan aplikasi MyTrading. Pastikan memahami fungsi setiap menu sebelum transaksi."
+                    ),
+                     React.createElement("div", { className: "mt-4 p-3 bg-blue-50 text-blue-800 rounded-lg text-xs border border-blue-100" },
+                        React.createElement("p", { className: "font-bold" }, "Butuh Bantuan?"),
+                        React.createElement("p", null, "Hubungi 085717050604 jika mengalami kendala sistem.")
+                    )
+                ),
+
+                // 1. Master Produk
+                React.createElement("div", { className: "bg-white p-5 rounded-xl border shadow-sm" },
+                    React.createElement("h3", { className: "font-bold text-md mb-3 text-slate-800 flex items-center gap-2" },
+                        React.createElement(Package, { className: "text-blue-500", size: 18 }), " 1. Master Produk / Barang"
+                    ),
+                    React.createElement("img", {
+                        src: "https://lh3.googleusercontent.com/d/1wIkcD0P8Cp353LYf72gMzm3tTyDP0AGa",
+                        className: "w-full rounded-lg border mb-3"
+                    }),
+                    React.createElement("ul", { className: "list-disc list-inside text-xs text-slate-700 space-y-1 bg-slate-50 p-3 rounded-lg" },
+                        React.createElement("li", null, "Gunakan menu ini untuk mendaftarkan barang baru yang belum ada di list."),
+                        React.createElement("li", null, "Input Nama Barang, Satuan (UOM), dan Keterangan."),
+                        React.createElement("li", null, "Klik Simpan Barang.")
+                    )
+                ),
+
+                // 2. Customer
+                React.createElement("div", { className: "bg-white p-5 rounded-xl border shadow-sm" },
+                    React.createElement("h3", { className: "font-bold text-md mb-3 text-slate-800 flex items-center gap-2" },
+                        React.createElement(Users, { className: "text-blue-500", size: 18 }), " 2. Menu Customer"
+                    ),
+                    React.createElement("img", {
+                        src: "https://lh3.googleusercontent.com/d/1-837eyrQbjLIwWcYYXFFEeFqynGbo4hO",
+                        className: "w-full rounded-lg border mb-3"
+                    }),
+                    React.createElement("ul", { className: "list-disc list-inside text-xs text-slate-700 space-y-1 bg-slate-50 p-3 rounded-lg" },
+                        React.createElement("li", null, "Input Nama Customer dan Alamat Lengkap."),
+                        React.createElement("li", null, "Pastikan penulisan alamat jelas untuk memudahkan driver.")
+                    )
+                ),
+
+                // 3. Armada & Riwayat
+                React.createElement("div", { className: "bg-white p-5 rounded-xl border shadow-sm" },
+                    React.createElement("h3", { className: "font-bold text-md mb-3 text-slate-800 flex items-center gap-2" },
+                        React.createElement(Truck, { className: "text-blue-500", size: 18 }), " 3. Armada & Riwayat"
+                    ),
+                    React.createElement("p", {className: "text-xs font-bold mb-2 text-slate-500"}, "A. Pendaftaran Armada"),
+                    React.createElement("img", {
+                        src: "https://lh3.googleusercontent.com/d/1nxv2JuAXul-GP01dnk4NMSCJOi0Rdr6U",
+                        className: "w-full rounded-lg border mb-3"
+                    }),
+                    React.createElement("p", {className: "text-xs font-bold mb-2 text-slate-500 mt-4"}, "B. Penyelesaian Tugas (Ritase)"),
+                    React.createElement("img", {
+                        src: "https://lh3.googleusercontent.com/d/1NRccJ7dx21qKCI-oOaAwgd7fGk0HQ4GO",
+                        className: "w-full rounded-lg border mb-3"
+                    }),
+                     React.createElement("ul", { className: "list-disc list-inside text-xs text-slate-700 space-y-1 bg-slate-50 p-3 rounded-lg" },
+                        React.createElement("li", null, "Daftarkan Nopol & Driver baru di menu Armada sebelum transaksi."),
+                        React.createElement("li", null, "Jika truk kembali dan ingin kirim lagi: Masuk menu ", React.createElement("strong", null, "Riwayat"), " -> Klik ", React.createElement("strong", {className:"text-orange-600"}, "SELESAI"), "."),
+                        React.createElement("li", null, "Klik 'Selesai' wajib dilakukan setelah driver menyerahkan SPJ & Bukti Timbang.")
+                    )
+                ),
+
+                // 4. Transaksi
+                React.createElement("div", { className: "bg-white p-5 rounded-xl border shadow-sm" },
+                    React.createElement("h3", { className: "font-bold text-md mb-3 text-slate-800 flex items-center gap-2" },
+                        React.createElement(ClipboardList, { className: "text-blue-500", size: 18 }), " 4. Menu Transaksi"
+                    ),
+                    React.createElement("img", {
+                        src: "https://lh3.googleusercontent.com/d/1pRVbVJeeqZDVfRp_QmCPl0w5bXkzdcw5",
+                        className: "w-full rounded-lg border mb-3"
+                    }),
+                     React.createElement("ul", { className: "list-disc list-inside text-xs text-slate-700 space-y-1 bg-slate-50 p-3 rounded-lg" },
+                        React.createElement("li", null, "Pilih Tanggal, Truk, Customer, dan Barang."),
+                        React.createElement("li", null, "Input Qty sesuai hasil timbangan."),
+                        React.createElement("li", null, "Klik Preview & Cetak untuk mencetak Surat Jalan.")
+                    )
+                )
+            );
+        };
 
         const RecapPage = ({ user }) => {
             const [transactions, setTransactions] = useState([]);
@@ -1121,7 +1209,8 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
                 {v: 'recap', i: FileSpreadsheet, l: 'Rekap'}, 
                 {v: 'register', i: Truck, l: 'Armada'},
                 {v: 'customers', i: Users, l: 'Customer'},
-                {v: 'items', i: Package, l: 'Barang'}
+                {v: 'items', i: Package, l: 'Barang'},
+                {v: 'instruction', i: Info, l: 'Panduan'} // Menu Baru Ditambahkan
             ];
 
             return (
@@ -1164,6 +1253,7 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
                         view === 'transaction' && React.createElement(TransactionForm, { user, trucks }),
                         view === 'history' && React.createElement(TransactionHistory, { user }),
                         view === 'recap' && React.createElement(RecapPage, { user }),
+                        view === 'instruction' && React.createElement(InstructionPage), // Render Halaman Instruksi
                         view === 'settings' && React.createElement(SettingsPage, { user })
                     ),
 
