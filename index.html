@@ -53,9 +53,9 @@
             scrollbar-width: none;
         }
         
-        /* Mobile optimization for inputs */
+        /* Mobile optimization */
         input, select, textarea {
-            font-size: 16px !important; /* Prevents zoom on iOS */
+            font-size: 16px !important;
         }
     </style>
 </head>
@@ -73,10 +73,11 @@
         } from 'lucide-react';
         
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const firebaseConfig = {
+        // Konfigurasi Firebase (Menggunakan Environment jika tersedia, atau fallback ke config user)
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyBhL4pBXzoaSkNjHWe524KQLAhd335qITs",
             authDomain: "logistik-tracker-app.firebaseapp.com",
             projectId: "logistik-tracker-app",
@@ -88,7 +89,7 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = 'my-trading-v1';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'my-trading-v1';
 
         const TRUCK_TYPES = ['CDD', 'TRONTON', 'DUMPTRUK', 'WINGBOX', 'KONTAINER', 'BOX', 'MOBIL PRIBADI'];
 
@@ -105,90 +106,7 @@
             driver: { top: 125, left: 75, label: 'Nama Driver' }
         };
 
-        function App() {
-            const [user, setUser] = useState(null);
-            const [view, setView] = useState('transaction'); 
-            const [loading, setLoading] = useState(true);
-            const [trucks, setTrucks] = useState([]); 
-
-            useEffect(() => {
-                const unsubscribe = onAuthStateChanged(auth, async (u) => {
-                    if (!u) await signInAnonymously(auth);
-                    setUser(u);
-                    setLoading(false);
-                });
-                return () => unsubscribe();
-            }, []);
-
-            useEffect(() => {
-                if (!user) return;
-                const qT = query(collection(db, 'artifacts', appId, 'public', 'data', 'trucks'));
-                const unsub = onSnapshot(qT, s => setTrucks(s.docs.map(d => ({id: d.id, ...d.data()}))));
-                return () => unsub();
-            }, [user]);
-
-            if (loading) return React.createElement('div', {className: "flex items-center justify-center h-screen bg-slate-50 font-mono text-blue-600 animate-pulse"}, "LOADING_TRADING_SYSTEM...");
-
-            const menuItems = [
-                {v: 'transaction', i: ClipboardList, l: 'Transaksi'},
-                {v: 'history', i: History, l: 'Riwayat'},
-                {v: 'recap', i: FileSpreadsheet, l: 'Rekap'}, 
-                {v: 'register', i: Truck, l: 'Armada'},
-                {v: 'customers', i: Users, l: 'Customer'},
-                {v: 'items', i: Package, l: 'Barang'}
-            ];
-
-            return (
-                React.createElement("div", { className: "min-h-screen bg-slate-100 flex flex-col" },
-                    React.createElement("header", { className: "bg-blue-800 text-white shadow-lg sticky top-0 z-20 no-print" },
-                        React.createElement("div", { className: "max-w-6xl mx-auto px-4" },
-                            React.createElement("div", { className: "flex items-center justify-between h-16" },
-                                React.createElement("div", { className: "flex items-center gap-2 shrink-0" },
-                                    React.createElement(TrendingUp, { size: 24 }),
-                                    React.createElement("h1", { className: "text-lg font-bold hidden sm:block" }, "My Trading"),
-                                    React.createElement("h1", { className: "text-lg font-bold sm:hidden" }, "MT")
-                                ),
-                                
-                                // MOBILE RESPONSIVE NAV: justify-start for scrolling, md:justify-center for desktop
-                                React.createElement("div", { className: "flex-1 flex justify-start md:justify-center px-4 overflow-x-auto hide-scrollbar" },
-                                    React.createElement("div", { className: "flex items-center gap-2 sm:gap-4" },
-                                        menuItems.map(item => (
-                                            React.createElement("button", { 
-                                                key: item.v, 
-                                                onClick: () => setView(item.v),
-                                                className: `flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all whitespace-nowrap text-sm ${view === item.v ? 'bg-blue-700 text-white shadow-inner' : 'text-blue-200 hover:text-white hover:bg-blue-700/50'}`
-                                            }, 
-                                                React.createElement(item.i, { size: 18 }),
-                                                React.createElement("span", { className: "text-xs font-bold uppercase" }, item.l)
-                                            )
-                                        ))
-                                    )
-                                ),
-
-                                React.createElement("button", { onClick: () => setView('settings'), className: `p-2 rounded-full transition-colors ${view === 'settings' ? 'bg-blue-700' : 'hover:bg-blue-700'}` }, 
-                                    React.createElement(Settings, { size: 20 })
-                                )
-                            )
-                        )
-                    ),
-
-                    // MOBILE RESPONSIVE MAIN: Adjusted padding p-2 for mobile
-                    React.createElement("main", { className: "max-w-4xl mx-auto p-2 md:p-4 md:pt-8 flex-1 w-full" },
-                        view === 'register' && React.createElement(RegisterTruckForm, { user, trucks }),
-                        view === 'customers' && React.createElement(MasterCustomerForm, { user }),
-                        view === 'items' && React.createElement(MasterItemForm, { user }),
-                        view === 'transaction' && React.createElement(TransactionForm, { user, trucks }),
-                        view === 'history' && React.createElement(TransactionHistory, { user }),
-                        view === 'recap' && React.createElement(RecapPage, { user }),
-                        view === 'settings' && React.createElement(SettingsPage, { user })
-                    ),
-
-                    React.createElement("footer", { className: "bg-white border-t p-4 text-center text-slate-400 text-xs no-print mt-auto" },
-                        React.createElement("p", null, `© ${new Date().getFullYear()} My Trading System. All rights reserved.`)
-                    )
-                )
-            );
-        }
+        // --- COMPONENTS DEFINITIONS (BEFORE APP) ---
 
         const RecapPage = ({ user }) => {
             const [transactions, setTransactions] = useState([]);
@@ -1156,6 +1074,103 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}
                 )
             );
         };
+
+        // --- MAIN APP COMPONENT (DEFINED LAST TO AVOID REFERENCE ERRORS) ---
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [view, setView] = useState('transaction'); 
+            const [loading, setLoading] = useState(true);
+            const [trucks, setTrucks] = useState([]); 
+
+            useEffect(() => {
+                const initAuth = async () => {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        console.error("Auth error:", error);
+                    }
+                };
+                initAuth();
+                
+                const unsubscribe = onAuthStateChanged(auth, (u) => {
+                    setUser(u);
+                    setLoading(false);
+                });
+                return () => unsubscribe();
+            }, []);
+
+            useEffect(() => {
+                if (!user) return;
+                const qT = query(collection(db, 'artifacts', appId, 'public', 'data', 'trucks'));
+                const unsub = onSnapshot(qT, s => setTrucks(s.docs.map(d => ({id: d.id, ...d.data()}))));
+                return () => unsub();
+            }, [user]);
+
+            if (loading) return React.createElement('div', {className: "flex items-center justify-center h-screen bg-slate-50 font-mono text-blue-600 animate-pulse"}, "LOADING_TRADING_SYSTEM...");
+
+            const menuItems = [
+                {v: 'transaction', i: ClipboardList, l: 'Transaksi'},
+                {v: 'history', i: History, l: 'Riwayat'},
+                {v: 'recap', i: FileSpreadsheet, l: 'Rekap'}, 
+                {v: 'register', i: Truck, l: 'Armada'},
+                {v: 'customers', i: Users, l: 'Customer'},
+                {v: 'items', i: Package, l: 'Barang'}
+            ];
+
+            return (
+                React.createElement("div", { className: "min-h-screen bg-slate-100 flex flex-col" },
+                    React.createElement("header", { className: "bg-blue-800 text-white shadow-lg sticky top-0 z-20 no-print" },
+                        React.createElement("div", { className: "max-w-6xl mx-auto px-4" },
+                            React.createElement("div", { className: "flex items-center justify-between h-16" },
+                                React.createElement("div", { className: "flex items-center gap-2 shrink-0" },
+                                    React.createElement(TrendingUp, { size: 24 }),
+                                    React.createElement("h1", { className: "text-lg font-bold hidden sm:block" }, "My Trading"),
+                                    React.createElement("h1", { className: "text-lg font-bold sm:hidden" }, "MT")
+                                ),
+                                
+                                React.createElement("div", { className: "flex-1 flex justify-start md:justify-center px-4 overflow-x-auto hide-scrollbar" },
+                                    React.createElement("div", { className: "flex items-center gap-2 sm:gap-4" },
+                                        menuItems.map(item => (
+                                            React.createElement("button", { 
+                                                key: item.v, 
+                                                onClick: () => setView(item.v),
+                                                className: `flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all whitespace-nowrap text-sm ${view === item.v ? 'bg-blue-700 text-white shadow-inner' : 'text-blue-200 hover:text-white hover:bg-blue-700/50'}`
+                                            }, 
+                                                React.createElement(item.i, { size: 18 }),
+                                                React.createElement("span", { className: "text-xs font-bold uppercase" }, item.l)
+                                            )
+                                        ))
+                                    )
+                                ),
+
+                                React.createElement("button", { onClick: () => setView('settings'), className: `p-2 rounded-full transition-colors ${view === 'settings' ? 'bg-blue-700' : 'hover:bg-blue-700'}` }, 
+                                    React.createElement(Settings, { size: 20 })
+                                )
+                            )
+                        )
+                    ),
+
+                    React.createElement("main", { className: "max-w-4xl mx-auto p-2 md:p-4 md:pt-8 flex-1 w-full" },
+                        view === 'register' && React.createElement(RegisterTruckForm, { user, trucks }),
+                        view === 'customers' && React.createElement(MasterCustomerForm, { user }),
+                        view === 'items' && React.createElement(MasterItemForm, { user }),
+                        view === 'transaction' && React.createElement(TransactionForm, { user, trucks }),
+                        view === 'history' && React.createElement(TransactionHistory, { user }),
+                        view === 'recap' && React.createElement(RecapPage, { user }),
+                        view === 'settings' && React.createElement(SettingsPage, { user })
+                    ),
+
+                    React.createElement("footer", { className: "bg-white border-t p-4 text-center text-slate-400 text-xs no-print mt-auto" },
+                        React.createElement("p", null, `© ${new Date().getFullYear()} My Trading System. All rights reserved.`)
+                    )
+                )
+            );
+        }
 
         const root = createRoot(document.getElementById('root'));
         root.render(React.createElement(App));
