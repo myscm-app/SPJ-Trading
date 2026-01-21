@@ -923,6 +923,12 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
             };
 
             const startEdit = (item) => {
+                // MODIFIKASI: Tambah Password Check
+                const password = prompt("Masukkan Password Admin untuk Edit Barang:");
+                if (password !== 'admin123') {
+                    alert("Password Salah! Akses ditolak.");
+                    return;
+                }
                 setEditingId(item.id);
                 setEditData(item);
             };
@@ -942,6 +948,13 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
             };
 
             const deleteItem = async (id) => {
+                // MODIFIKASI: Tambah Password Check
+                const password = prompt("Masukkan Password Admin untuk Hapus Barang:");
+                if (password !== 'admin123') {
+                    alert("Password Salah! Akses ditolak.");
+                    return;
+                }
+
                 if(confirm("Hapus barang ini?")) {
                     await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'items', id));
                 }
@@ -1012,6 +1025,12 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
             };
 
             const startEdit = (truck) => {
+                // MODIFIKASI: Tambah Password Check
+                const password = prompt("Masukkan Password Admin untuk Edit Armada:");
+                if (password !== 'admin123') {
+                    alert("Password Salah! Akses ditolak.");
+                    return;
+                }
                 setEditingId(truck.id);
                 setEditData(truck);
             };
@@ -1038,6 +1057,13 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
             };
 
             const deleteTruck = async (id) => {
+                // MODIFIKASI: Tambah Password Check
+                const password = prompt("Masukkan Password Admin untuk Hapus Armada:");
+                if (password !== 'admin123') {
+                    alert("Password Salah! Akses ditolak.");
+                    return;
+                }
+
                 if(confirm("Yakin hapus armada ini?")) {
                     await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trucks', id));
                 }
