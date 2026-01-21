@@ -76,7 +76,7 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Konfigurasi Firebase (Menggunakan Environment jika tersedia, atau fallback ke config user)
+        // Konfigurasi Firebase
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyBhL4pBXzoaSkNjHWe524KQLAhd335qITs",
             authDomain: "logistik-tracker-app.firebaseapp.com",
@@ -106,7 +106,7 @@
             driver: { top: 125, left: 75, label: 'Nama Driver' }
         };
 
-        // --- COMPONENTS DEFINITIONS (BEFORE APP) ---
+        // --- DEFINISI KOMPONEN ANAK (Didefinisikan SEBELUM App) ---
 
         const RecapPage = ({ user }) => {
             const [transactions, setTransactions] = useState([]);
@@ -300,9 +300,7 @@
 --------------------------------
 1. ${data.itemName}
    📦 ${data.qty} ${data.uom}
-${data.notes ? `   📝 Ket: ${data.notes}` : ''}
-
-> _Sent via fonnte.com_`;
+${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
 
                 const groups = waConfig.targetGroups.split(',').map(g => g.trim()).filter(g => g);
 
@@ -346,7 +344,6 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}
                 }
             };
 
-            // Helper for inline styles
             const getPosStyle = (key) => ({
                 position: 'absolute',
                 top: `${printConfig[key]?.top || 0}mm`,
@@ -1075,7 +1072,8 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}
             );
         };
 
-        // --- MAIN APP COMPONENT (DEFINED LAST TO AVOID REFERENCE ERRORS) ---
+        // --- KOMPONEN UTAMA (APP) ---
+        // Didefinisikan TERAKHIR untuk memastikan semua komponen anak sudah ada
 
         function App() {
             const [user, setUser] = useState(null);
