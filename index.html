@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logistik Tracker - Surat Jalan</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.294.0"
+      }
+    }
+    </script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+
+        @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            @page { size: auto; margin: 0mm; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+    <div id="root"></div>
+
+    <script type="module">
+        import React, { useState, useEffect, useMemo } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import { 
+            Truck, ClipboardList, CheckCircle, PlusCircle, User, Phone, 
+            Box, Search, History, Settings, Save, AlertCircle, Users, 
+            Package, Printer, Calendar, FileText, AlignJustify, Lock 
+        } from 'lucide-react';
+        
+        // Import Firebase dari CDN
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, collection, addDoc, query, onSnapshot, 
+            doc, updateDoc, serverTimestamp 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables provided by environment
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'truck-manager-app';
+
+        // URL Script Google Sheet (Optional)
+        const GOOGLE_SCRIPT_URL = "";
+
+        // --- Constants ---
+        const TRUCK_TYPES = ['SDD', 'TRONTON', 'DUMPTRUK', 'WINGBOX', 'KONTAINER', 'BOX', 'MOBIL PRIBADI'];
+
+        // --- Utility: Send to Sheet ---
+        const sendToSheet = async (data, type = 'TRANSAKSI') => {
+            const sheetUrl = localStorage.getItem('truck_app_sheet_url') || GOOGLE_SCRIPT_URL;
+            if (!sheetUrl) return;
+
+            try {
+                await fetch(sheetUrl, {
+                    method: 'POST',
+                    mode: 'no-cors', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...data, dataType: type })
+                });
+            } catch (err) {
+                console.error("Failed to send to sheet", err);
+            }
+        };
+
+        // --- Main Component ---
+        function App() {
+            const [user, setUser] = useState(null);
+            const [view, setView] = useState('transaction'); 
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                const initAuth = async () => {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        console.error("Auth Error:", error);
+                    }
+                };
+                initAuth();
+                const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+                    setUser(currentUser);
+                    setLoading(false);
+                });
+                return () => unsubscribe();
+            }, []);
+
+            if (loading) return React.createElement('div', {className: "flex items-center justify-center h-screen bg-slate-50"}, React.createElement('div', {className: "text-blue-600 animate-pulse font-semibold text-lg font-mono"}, "LOGISTIK_SYSTEM_LOADING..."));
+            
+            return (
+                React.createElement("div", { className: "min-h-screen bg-slate-100 font-sans text-slate-800 pb-20 md:pb-0" },
+                    // Header
+                    React.createElement("header", { className: "bg-blue-700 text-white p-4 shadow-lg sticky top-0 z-10 print:hidden" },
+                        React.createElement("div", { className: "max-w-4xl mx-auto flex items-center justify-between" },
+                            React.createElement("div", { className: "flex items-center gap-2" },
+                                React.createElement(Truck, { className: "h-6 w-6" }),
+                                React.createElement("h1", { className: "text-xl font-bold tracking-tight" }, "Logistik Tracker")
+                            ),
+                            React.createElement("div", { className: "flex items-center gap-3" },
+                                React.createElement("button", { onClick: () => setView('settings'), className: "p-2 rounded-full hover:bg-blue-600 transition-colors", title: "Pengaturan" },
+                                    React.createElement(Settings, { size: 20 })
+                                )
+                            )
+                        )
+                    ),
+
+                    // Main Content
+                    React.createElement("main", { className: "max-w-4xl mx-auto p-4 print:p-0" },
+                        React.createElement("div", { className: "print:hidden" },
+                            view === 'register' && React.createElement(RegisterTruckForm, { user: user }),
+                            view === 'customers' && React.createElement(MasterCustomerForm, { user: user }),
+                            view === 'items' && React.createElement(MasterItemForm, { user: user }),
+                            view === 'transaction' && React.createElement(TransactionForm, { user: user }),
+                            view === 'history' && React.createElement(TransactionHistory, { user: user }),
+                            view === 'settings' && React.createElement(SettingsPage, null)
+                        )
+                    ),
+
+                    // Navigation
+                    React.createElement("div", { className: "print:hidden" },
+                        // Desktop
+                        React.createElement("div", { className: "hidden md:flex flex-wrap justify-center gap-2 mt-6 pb-10" },
+                            React.createElement(NavButtonDesktop, { active: view === 'transaction', onClick: () => setView('transaction'), label: "Surat Jalan", icon: React.createElement(ClipboardList, { size: 18 }) }),
+                            React.createElement(NavButtonDesktop, { active: view === 'history', onClick: () => setView('history'), label: "Riwayat", icon: React.createElement(History, { size: 18 }) }),
+                            React.createElement("div", { className: "w-px bg-slate-300 mx-2 h-8 self-center" }),
+                            React.createElement(NavButtonDesktop, { active: view === 'register', onClick: () => setView('register'), label: "Truk", icon: React.createElement(Truck, { size: 18 }) }),
+                            React.createElement(NavButtonDesktop, { active: view === 'customers', onClick: () => setView('customers'), label: "Customer", icon: React.createElement(Users, { size: 18 }) }),
+                            React.createElement(NavButtonDesktop, { active: view === 'items', onClick: () => setView('items'), label: "Barang", icon: React.createElement(Package, { size: 18 }) })
+                        ),
+                        // Mobile
+                        React.createElement("nav", { className: "fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] md:hidden z-20" },
+                            React.createElement("div", { className: "flex justify-around p-2" },
+                                React.createElement(NavButtonMobile, { active: view === 'transaction', onClick: () => setView('transaction'), icon: React.createElement(ClipboardList, { size: 20 }), label: "Transaksi" }),
+                                React.createElement(NavButtonMobile, { active: view === 'history', onClick: () => setView('history'), icon: React.createElement(History, { size: 20 }), label: "Riwayat" }),
+                                React.createElement(NavButtonMobile, { active: view === 'register', onClick: () => setView('register'), icon: React.createElement(Truck, { size: 20 }), label: "Truk" }),
+                                React.createElement(NavButtonMobile, { active: view === 'customers', onClick: () => setView('customers'), icon: React.createElement(Users, { size: 20 }), label: "Cust" }),
+                                React.createElement(NavButtonMobile, { active: view === 'items', onClick: () => setView('items'), icon: React.createElement(Package, { size: 20 }), label: "Barang" })
+                            )
+                        )
+                    )
+                )
+            );
+        }
+
+        const NavButtonDesktop = ({ active, onClick, label, icon }) => (
+            React.createElement("button", { onClick: onClick, className: `px-4 py-2 rounded-full flex items-center gap-2 text-sm font-medium transition-all ${active ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'}` }, icon, " ", label)
+        );
+
+        const NavButtonMobile = ({ active, onClick, icon, label }) => (
+            React.createElement("button", { onClick: onClick, className: `flex flex-col items-center p-2 rounded-lg ${active ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}` }, icon, React.createElement("span", { className: "text-[10px] mt-1 font-medium" }, label))
+        );
+
+        // --- Sub-components ---
+
+        const MasterCustomerForm = ({ user }) => {
+            const [formData, setFormData] = useState({ name: '', address: '', phone: '' });
+            const [msg, setMsg] = useState('');
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (!user) return;
+                try {
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'customers'), { ...formData, createdAt: serverTimestamp() });
+                    setMsg('Customer disimpan!'); setFormData({ name: '', address: '', phone: '' }); setTimeout(() => setMsg(''), 3000);
+                } catch (e) { console.error(e); }
+            };
+            return React.createElement("div", { className: "bg-white rounded-xl shadow-sm border p-6 animate-fade-in" },
+                React.createElement("h2", { className: "text-lg font-bold mb-4 flex items-center gap-2" }, React.createElement(Users, { className: "text-blue-500" }), " Master Data Customer"),
+                msg && React.createElement("div", { className: "mb-4 p-2 bg-green-50 text-green-700 rounded text-sm" }, msg),
+                React.createElement("form", { onSubmit: handleSubmit, className: "space-y-4" },
+                    React.createElement("input", { required: true, type: "text", placeholder: "Nama Customer / PT", className: "w-full p-3 bg-slate-50 border rounded-lg", value: formData.name, onChange: e => setFormData({...formData, name: e.target.value}) }),
+                    React.createElement("textarea", { placeholder: "Alamat Lengkap", className: "w-full p-3 bg-slate-50 border rounded-lg", rows: 2, value: formData.address, onChange: e => setFormData({...formData, address: e.target.value}) }),
+                    React.createElement("input", { type: "text", placeholder: "No Telepon", className: "w-full p-3 bg-slate-50 border rounded-lg", value: formData.phone, onChange: e => setFormData({...formData, phone: e.target.value}) }),
+                    React.createElement("button", { type: "submit", className: "w-full bg-slate-800 text-white font-bold py-3 rounded-lg" }, "Simpan Customer")
+                )
+            );
+        };
+
+        const MasterItemForm = ({ user }) => {
+            const [formData, setFormData] = useState({ name: '', uom: 'PCS', remarks: '' });
+            const [msg, setMsg] = useState('');
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (!user) return;
+                try {
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'items'), { ...formData, createdAt: serverTimestamp() });
+                    setMsg('Barang disimpan!'); setFormData({ name: '', uom: 'PCS', remarks: '' }); setTimeout(() => setMsg(''), 3000);
+                } catch (e) { console.error(e); }
+            };
+            return React.createElement("div", { className: "bg-white rounded-xl shadow-sm border p-6 animate-fade-in" },
+                React.createElement("h2", { className: "text-lg font-bold mb-4 flex items-center gap-2" }, React.createElement(Package, { className: "text-blue-500" }), " Master Data Barang"),
+                msg && React.createElement("div", { className: "mb-4 p-2 bg-green-50 text-green-700 rounded text-sm" }, msg),
+                React.createElement("form", { onSubmit: handleSubmit, className: "space-y-4" },
+                    React.createElement("input", { required: true, type: "text", placeholder: "Nama Barang", className: "w-full p-3 bg-slate-50 border rounded-lg", value: formData.name, onChange: e => setFormData({...formData, name: e.target.value}) }),
+                    React.createElement("div", { className: "grid grid-cols-2 gap-4" },
+                        React.createElement("input", { required: true, type: "text", placeholder: "Satuan (UOM)", className: "w-full p-3 bg-slate-50 border rounded-lg uppercase", value: formData.uom, onChange: e => setFormData({...formData, uom: e.target.value.toUpperCase()}) }),
+                        React.createElement("input", { type: "text", placeholder: "Keterangan", className: "w-full p-3 bg-slate-50 border rounded-lg", value: formData.remarks, onChange: e => setFormData({...formData, remarks: e.target.value}) })
+                    ),
+                    React.createElement("button", { type: "submit", className: "w-full bg-slate-800 text-white font-bold py-3 rounded-lg" }, "Simpan Barang")
+                )
+            );
+        };
+
+        const TransactionForm = ({ user }) => {
+            const [trucks, setTrucks] = useState([]);
+            const [customers, setCustomers] = useState([]);
+            const [items, setItems] = useState([]);
+            const [activeTransactions, setActiveTransactions] = useState([]);
+
+            const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+            const [selectedTruckId, setSelectedTruckId] = useState('');
+            const [selectedCustId, setSelectedCustId] = useState('');
+            const [selectedItemId, setSelectedItemId] = useState('');
+            const [qty, setQty] = useState('');
+            const [uom, setUom] = useState('');
+            const [notes, setNotes] = useState('');
+            const [isSubmitting, setIsSubmitting] = useState(false);
+            const [lastTransaction, setLastTransaction] = useState(null);
+
+            useEffect(() => {
+                if (!user) return;
+                const unsubTrucks = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'trucks')), s => setTrucks(s.docs.map(d => ({id: d.id, ...d.data()}))), e => console.error(e));
+                const unsubCust = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'customers')), s => setCustomers(s.docs.map(d => ({id: d.id, ...d.data()}))), e => console.error(e));
+                const unsubItems = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'items')), s => setItems(s.docs.map(d => ({id: d.id, ...d.data()}))), e => console.error(e));
+                const unsubTrans = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'transactions')), s => {
+                    setActiveTransactions(s.docs.map(d => ({id: d.id, ...d.data()})).filter(t => t.status === 'ACTIVE'));
+                }, e => console.error(e));
+                return () => { unsubTrucks(); unsubCust(); unsubItems(); unsubTrans(); };
+            }, [user]);
+
+            const availableTrucks = trucks.filter(truck => !activeTransactions.some(at => at.nopol === truck.nopol));
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (!user || !selectedTruckId) return;
+                setIsSubmitting(true);
+
+                const truck = trucks.find(t => t.id === selectedTruckId);
+                const customer = customers.find(c => c.id === selectedCustId);
+                const item = items.find(i => i.id === selectedItemId);
+
+                const payload = {
+                    date, truckId: selectedTruckId, nopol: truck.nopol, driver: truck.driver, type: truck.type,
+                    customerName: customer?.name || 'Manual', itemName: item?.name || 'Manual', qty, uom: uom || item?.uom, notes,
+                    status: 'ACTIVE', timestamp: serverTimestamp(), createdBy: user.uid
+                };
+
+                try {
+                    const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), payload);
+                    setLastTransaction({ ...payload, id: docRef.id });
+                    setSelectedTruckId(''); setQty('');
+                } catch (error) { console.error(error); } 
+                finally { setIsSubmitting(false); }
+            };
+
+            if (lastTransaction) {
+                return React.createElement("div", { className: "bg-white rounded-xl shadow-lg border p-8 text-center animate-fade-in" },
+                    React.createElement(CheckCircle, { size: 48, className: "text-green-500 mx-auto mb-4" }),
+                    React.createElement("h2", { className: "text-xl font-bold mb-4" }, "Berhasil Dibuat!"),
+                    React.createElement("div", { className: "flex flex-col gap-2 mb-6" },
+                        React.createElement("button", { onClick: () => window.print(), className: "bg-blue-600 text-white py-3 rounded-lg font-bold" }, "Cetak Surat Jalan"),
+                        React.createElement("button", { onClick: () => setLastTransaction(null), className: "text-blue-600 font-medium py-2" }, "Kembali")
+                    ),
+                    React.createElement("div", {className: "hidden print:block text-left"}, 
+                        React.createElement("h1", {className:"text-2xl font-bold border-b-2 border-black mb-4"}, "SURAT JALAN"),
+                        React.createElement("p", null, "Tanggal: ", lastTransaction.date),
+                        React.createElement("p", null, "Tujuan: ", lastTransaction.customerName),
+                        React.createElement("p", null, "Armada: ", lastTransaction.nopol, " (", lastTransaction.driver, ")"),
+                        React.createElement("div", {className: "mt-4 border border-black p-4"}, 
+                           React.createElement("p", null, "Item: ", lastTransaction.itemName),
+                           React.createElement("p", null, "Qty: ", lastTransaction.qty, " ", lastTransaction.uom)
+                        )
+                    )
+                );
+            }
+
+            return React.createElement("div", { className: "bg-white rounded-xl shadow-sm border p-6" },
+                React.createElement("h2", { className: "text-lg font-bold mb-6 flex items-center gap-2 border-b pb-4" }, React.createElement(ClipboardList, { className: "text-blue-500" }), " Input Surat Jalan"),
+                React.createElement("form", { onSubmit: handleSubmit, className: "space-y-6" },
+                    React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4" },
+                        React.createElement("div", null,
+                            React.createElement("label", { className: "block text-xs font-bold text-slate-500 mb-1" }, "TANGGAL"),
+                            React.createElement("input", { type: "date", required: true, className: "w-full p-3 bg-slate-50 border rounded-lg", value: date, onChange: e => setDate(e.target.value) })
+                        ),
+                        React.createElement("div", null,
+                            React.createElement("label", { className: "block text-xs font-bold text-slate-500 mb-1" }, "PILIH TRUK"),
+                            React.createElement("select", { required: true, className: "w-full p-3 bg-white border rounded-lg", value: selectedTruckId, onChange: e => setSelectedTruckId(e.target.value) },
+                                React.createElement("option", { value: "" }, "-- Pilih Truk --"),
+                                availableTrucks.map(t => React.createElement("option", { key: t.id, value: t.id }, `${t.nopol} (${t.driver})`))
+                            )
+                        )
+                    ),
+                    React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4" },
+                        React.createElement("div", null,
+                            React.createElement("label", { className: "block text-xs font-bold text-slate-500 mb-1" }, "CUSTOMER"),
+                            React.createElement("select", { required: true, className: "w-full p-3 bg-white border rounded-lg", value: selectedCustId, onChange: e => setSelectedCustId(e.target.value) },
+                                React.createElement("option", { value: "" }, "-- Pilih Customer --"),
+                                customers.map(c => React.createElement("option", { key: c.id, value: c.id }, c.name))
+                            )
+                        ),
+                        React.createElement("div", null,
+                            React.createElement("label", { className: "block text-xs font-bold text-slate-500 mb-1" }, "BARANG"),
+                            React.createElement("select", { required: true, className: "w-full p-3 bg-white border rounded-lg", value: selectedItemId, onChange: e => setSelectedItemId(e.target.value) },
+                                React.createElement("option", { value: "" }, "-- Pilih Barang --"),
+                                items.map(i => React.createElement("option", { key: i.id, value: i.id }, i.name))
+                            )
+                        )
+                    ),
+                    React.createElement("div", { className: "grid grid-cols-2 gap-4" },
+                        React.createElement("input", { type: "number", required: true, placeholder: "Jumlah", className: "p-3 bg-slate-50 border rounded-lg", value: qty, onChange: e => setQty(e.target.value) }),
+                        React.createElement("input", { type: "text", placeholder: "Satuan", className: "p-3 bg-slate-50 border rounded-lg", value: uom, onChange: e => setUom(e.target.value) })
+                    ),
+                    React.createElement("button", { type: "submit", disabled: isSubmitting, className: "w-full bg-blue-600 text-white font-bold py-4 rounded-lg shadow-lg disabled:opacity-50" }, isSubmitting ? 'Menyimpan...' : 'Simpan & Cetak')
+                )
+            );
+        };
+
+        const TransactionHistory = ({ user }) => {
+            const [transactions, setTransactions] = useState([]);
+            useEffect(() => {
+                if (!user) return;
+                const unsub = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'transactions')), s => {
+                    const data = s.docs.map(d => ({id: d.id, ...d.data()}));
+                    setTransactions(data.sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0)));
+                }, e => console.error(e));
+                return () => unsub();
+            }, [user]);
+
+            const handleFinish = async (id) => {
+                if(!confirm("Selesaikan transaksi?")) return;
+                try {
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', id), { status: 'COMPLETED', completedAt: serverTimestamp() });
+                } catch (e) { console.error(e); }
+            };
+
+            return React.createElement("div", { className: "space-y-4" },
+                React.createElement("h2", { className: "font-bold text-lg flex gap-2" }, React.createElement(History, { className: "text-blue-500" }), " Riwayat Transaksi"),
+                transactions.length === 0 && React.createElement("p", {className: "text-slate-400 text-center py-10 italic"}, "Belum ada data."),
+                transactions.map(t => React.createElement("div", { key: t.id, className: `bg-white p-4 rounded-lg border shadow-sm ${t.status === 'ACTIVE' ? 'border-l-4 border-l-blue-500' : 'opacity-70'}` },
+                    React.createElement("div", { className: "flex justify-between items-start" },
+                        React.createElement("div", null,
+                            React.createElement("div", { className: "font-bold text-lg" }, t.nopol),
+                            React.createElement("div", { className: "text-sm text-slate-500" }, t.customerName, " - ", t.itemName),
+                            React.createElement("div", { className: "text-xs mt-1 text-slate-400" }, t.date)
+                        ),
+                        t.status === 'ACTIVE' && React.createElement("button", { onClick: () => handleFinish(t.id), className: "bg-slate-800 text-white text-xs px-3 py-2 rounded" }, "Selesai")
+                    )
+                ))
+            );
+        };
+
+        const RegisterTruckForm = ({ user }) => {
+            const [formData, setFormData] = useState({ nopol: '', driver: '', phone: '', type: 'SDD' });
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (!user) return;
+                try {
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'trucks'), { ...formData, nopol: formData.nopol.toUpperCase(), createdAt: serverTimestamp() });
+                    alert("Truk tersimpan"); setFormData({ nopol: '', driver: '', phone: '', type: 'SDD' });
+                } catch (e) { console.error(e); }
+            };
+            return React.createElement("div", { className: "bg-white p-6 rounded-xl border" },
+                React.createElement("h2", { className: "font-bold mb-4 flex gap-2" }, React.createElement(PlusCircle, { className: "text-blue-500" }), " Registrasi Truk"),
+                React.createElement("form", { onSubmit: handleSubmit, className: "space-y-4" },
+                    React.createElement("input", { required: true, placeholder: "No Polisi (B 1234 ABC)", className: "w-full p-3 border rounded-lg", value: formData.nopol, onChange: e => setFormData({...formData, nopol: e.target.value}) }),
+                    React.createElement("input", { required: true, placeholder: "Nama Driver", className: "w-full p-3 border rounded-lg", value: formData.driver, onChange: e => setFormData({...formData, driver: e.target.value}) }),
+                    React.createElement("select", { className: "w-full p-3 border rounded-lg", value: formData.type, onChange: e => setFormData({...formData, type: e.target.value}) }, TRUCK_TYPES.map(t => React.createElement("option", { key: t, value: t }, t))),
+                    React.createElement("button", { className: "w-full bg-blue-600 text-white p-3 rounded-lg font-bold" }, "Simpan")
+                )
+            );
+        };
+
+        const SettingsPage = () => {
+            return React.createElement("div", { className: "bg-white p-6 rounded-xl border text-center" },
+                React.createElement(Settings, { className: "mx-auto mb-2 text-slate-300", size: 40 }),
+                React.createElement("p", { className: "text-slate-500" }, "Versi Aplikasi 1.0.4"),
+                React.createElement("p", { className: "text-xs text-slate-400 mt-1" }, "Sistem Logistik Cloud")
+            );
+        };
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(React.createElement(App));
+    </script>
+</body>
+</html>
