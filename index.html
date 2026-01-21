@@ -42,7 +42,6 @@
             backdrop-filter: blur(4px);
         }
 
-        /* Custom scrollbar for horizontal menu on small screens */
         .hide-scrollbar::-webkit-scrollbar {
             display: none;
         }
@@ -61,7 +60,7 @@
         import { 
             Truck, ClipboardList, CheckCircle, PlusCircle, User, Phone, 
             Box, Search, History, Settings, Save, AlertCircle, Users, 
-            Package, Printer, Calendar, FileText, X, Eye, AlignJustify, TrendingUp
+            Package, Printer, Calendar, FileText, X, Eye, AlignJustify, TrendingUp, MessageSquare
         } from 'lucide-react';
         
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -110,18 +109,15 @@
 
             return (
                 React.createElement("div", { className: "min-h-screen bg-slate-100" },
-                    // HEADER DENGAN NAVIGASI TERINTEGRASI
                     React.createElement("header", { className: "bg-blue-800 text-white shadow-lg sticky top-0 z-20 no-print" },
                         React.createElement("div", { className: "max-w-6xl mx-auto px-4" },
                             React.createElement("div", { className: "flex items-center justify-between h-16" },
-                                // Logo Baru: My Trading
                                 React.createElement("div", { className: "flex items-center gap-2 shrink-0" },
                                     React.createElement(TrendingUp, { size: 24 }),
                                     React.createElement("h1", { className: "text-lg font-bold hidden sm:block" }, "My Trading"),
                                     React.createElement("h1", { className: "text-lg font-bold sm:hidden" }, "MT")
                                 ),
                                 
-                                // Menu Desktop & Mobile Horizontal
                                 React.createElement("div", { className: "flex-1 flex justify-center px-4 overflow-x-auto hide-scrollbar" },
                                     React.createElement("div", { className: "flex items-center gap-1 sm:gap-4" },
                                         menuItems.map(item => (
@@ -137,7 +133,6 @@
                                     )
                                 ),
 
-                                // Settings
                                 React.createElement("button", { onClick: () => setView('settings'), className: `p-2 rounded-full transition-colors ${view === 'settings' ? 'bg-blue-700' : 'hover:bg-blue-700'}` }, 
                                     React.createElement(Settings, { size: 20 })
                                 )
@@ -170,7 +165,7 @@
                 itemId: '',
                 qty: '',
                 uom: '',
-                notes: ''
+                notes: '' // Field Keterangan
             });
 
             const [previewData, setPreviewData] = useState(null);
@@ -272,6 +267,17 @@
                                 React.createElement("input", { type: "text", className: "w-full p-2 border rounded-lg", placeholder: "Contoh: Pallet/Box", value: formData.uom, onChange: e => setFormData({...formData, uom: e.target.value}) })
                             )
                         ),
+                        // Field Keterangan Baru
+                        React.createElement("div", null,
+                            React.createElement("label", { className: "text-xs font-bold text-slate-500" }, "KETERANGAN TAMBAHAN"),
+                            React.createElement("textarea", { 
+                                className: "w-full p-2 border rounded-lg", 
+                                rows: 2,
+                                placeholder: "Contoh: Titip di Satpam / Barang fragile",
+                                value: formData.notes, 
+                                onChange: e => setFormData({...formData, notes: e.target.value}) 
+                            })
+                        ),
                         React.createElement("button", { type: "submit", className: "w-full bg-blue-600 text-white font-bold py-3 rounded-lg shadow hover:bg-blue-700 transition-all" }, "Preview & Cetak")
                     )
                 ),
@@ -309,7 +315,7 @@
                                         React.createElement("div", null, React.createElement("p", null, "Kepada:"), React.createElement("p", {className:"font-bold"}, previewData.customerName), React.createElement("p", null, previewData.customerAddress)),
                                         React.createElement("div", { className: "text-right" }, React.createElement("p", null, "Tanggal: ", previewData.date), React.createElement("p", null, "No. Polisi: ", previewData.nopol), React.createElement("p", null, "Driver: ", previewData.driver))
                                     ),
-                                    React.createElement("table", { className: "w-full border-collapse border border-black text-xs mb-10" },
+                                    React.createElement("table", { className: "w-full border-collapse border border-black text-xs mb-1" },
                                         React.createElement("thead", { className: "bg-slate-100" },
                                             React.createElement("tr", null,
                                                 React.createElement("th", {className:"border border-black p-1"}, "NAMA BARANG"),
@@ -324,6 +330,9 @@
                                                 React.createElement("td", {className:"border border-black p-1 text-center"}, previewData.uom)
                                             )
                                         )
+                                    ),
+                                    previewData.notes && React.createElement("div", { className: "p-2 bg-slate-50 border border-t-0 text-[10px] italic border-black mb-10" }, 
+                                        "Ket: ", previewData.notes
                                     )
                                 ) : 
                                 React.createElement("div", { className: "relative min-h-[300px]" },
@@ -339,7 +348,8 @@
                                         React.createElement("p", null, previewData.itemName),
                                         React.createElement("p", { className: "text-center" }, previewData.qty),
                                         React.createElement("p", { className: "text-center" }, previewData.uom)
-                                    )
+                                    ),
+                                    React.createElement("p", { className: "mt-4 text-sm" }, "Ket: ", previewData.notes)
                                 )
                             )
                         ),
@@ -373,7 +383,7 @@
                                 React.createElement("p", null, "Sopir: ", React.createElement("span", {className:"font-bold"}, previewData.driver))
                             )
                         ),
-                        React.createElement("table", { className: "w-full border-collapse border border-black mb-12" },
+                        React.createElement("table", { className: "w-full border-collapse border border-black" },
                             React.createElement("thead", null,
                                 React.createElement("tr", { className: "bg-gray-100" },
                                     React.createElement("th", { className: "border border-black p-3 text-left" }, "DESKRIPSI BARANG"),
@@ -389,7 +399,10 @@
                                 )
                             )
                         ),
-                        React.createElement("div", { className: "grid grid-cols-3 text-center text-xs mt-20" },
+                        React.createElement("div", { className: "p-2 border border-black border-t-0 text-xs italic mb-20" }, 
+                            "Keterangan: ", previewData.notes || "-"
+                        ),
+                        React.createElement("div", { className: "grid grid-cols-3 text-center text-xs" },
                             ['Hormat Kami', 'Sopir', 'Penerima'].map(pos => (
                                 React.createElement("div", { key: pos }, 
                                     React.createElement("p", { className: "mb-20 uppercase font-bold" }, pos),
@@ -400,14 +413,20 @@
                         )
                     ) : 
                     React.createElement("div", { className: "spj-blanko-data font-print text-lg text-black" },
+                        // Penyesuaian kordinat sesuai blangko pada gambar user
                         React.createElement("div", { style: { position: 'absolute', top: '35mm', left: '140mm' } }, previewData.date),
                         React.createElement("div", { style: { position: 'absolute', top: '42mm', left: '140mm' } }, previewData.nopol),
-                        React.createElement("div", { style: { position: 'absolute', top: '55mm', left: '20mm', fontWeight: 'bold' } }, previewData.customerName),
-                        React.createElement("div", { style: { position: 'absolute', top: '62mm', left: '20mm', fontSize: '12px', width: '80mm' } }, previewData.customerAddress),
+                        React.createElement("div", { style: { position: 'absolute', top: '52mm', left: '20mm', fontWeight: 'bold' } }, previewData.customerName),
+                        React.createElement("div", { style: { position: 'absolute', top: '58mm', left: '20mm', fontSize: '12px', width: '80mm' } }, previewData.customerAddress),
                         
                         React.createElement("div", { style: { position: 'absolute', top: '85mm', left: '15mm' } }, previewData.itemName),
                         React.createElement("div", { style: { position: 'absolute', top: '85mm', left: '100mm', fontWeight: 'bold' } }, previewData.qty),
                         React.createElement("div", { style: { position: 'absolute', top: '85mm', left: '130mm' } }, previewData.uom),
+
+                        // Keterangan diletakkan di bawah baris barang
+                        React.createElement("div", { style: { position: 'absolute', top: '95mm', left: '15mm', fontSize: '14px', fontStyle: 'italic' } }, 
+                           previewData.notes ? `Ket: ${previewData.notes}` : ''
+                        ),
 
                         React.createElement("div", { style: { position: 'absolute', top: '125mm', left: '75mm', textAlign: 'center', width: '50mm' } }, previewData.driver)
                     )
@@ -439,7 +458,8 @@
                         React.createElement("div", null,
                             React.createElement("p", { className: "font-black text-lg" }, t.nopol),
                             React.createElement("p", { className: "text-sm font-bold text-slate-600" }, t.customerName),
-                            React.createElement("p", { className: "text-xs text-blue-600" }, t.itemName, " - ", t.qty, " ", t.uom)
+                            React.createElement("p", { className: "text-xs text-blue-600" }, t.itemName, " - ", t.qty, " ", t.uom),
+                            t.notes && React.createElement("p", { className: "text-[10px] text-slate-400 italic" }, "Ket: ", t.notes)
                         ),
                         t.status === 'ACTIVE' && React.createElement("button", { onClick: () => handleFinish(t.id), className: "bg-orange-500 text-white text-xs px-4 py-2 rounded-lg font-bold hover:bg-orange-600 transition-colors" }, "SELESAI")
                     ))
