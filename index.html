@@ -65,7 +65,7 @@
             Truck, ClipboardList, CheckCircle, PlusCircle, User, Phone, 
             Box, Search, History, Settings, Save, AlertCircle, Users, 
             Package, Printer, Calendar, FileText, X, Eye, AlignJustify, 
-            TrendingUp, MessageSquare, Pencil, Trash2, FileSpreadsheet, Download, Send
+            TrendingUp, MessageSquare, Pencil, Trash2, FileSpreadsheet, Download, Send, Lock
         } from 'lucide-react';
         
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -547,6 +547,8 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
         };
 
         const SettingsPage = ({ user }) => {
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [loginData, setLoginData] = useState({ username: '', password: '' });
             const [activeTab, setActiveTab] = useState('general');
             const [coords, setCoords] = useState(DEFAULT_COORDS);
             const [waConfig, setWaConfig] = useState({ token: '', targetGroups: '' });
@@ -564,6 +566,44 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
                 };
                 loadSettings();
             }, [user]);
+
+            const handleLogin = (e) => {
+                e.preventDefault();
+                if (loginData.username === 'admin' && loginData.password === 'admin123') {
+                    setIsAuthenticated(true);
+                } else {
+                    alert("Username atau Password salah!");
+                }
+            };
+
+            if (!isAuthenticated) {
+                return React.createElement("div", { className: "max-w-md mx-auto mt-10 bg-white p-8 rounded-xl border shadow-sm" },
+                    React.createElement("h2", { className: "text-xl font-bold text-center mb-6 flex items-center justify-center gap-2" }, 
+                        React.createElement(Settings, { className: "text-blue-500" }), "Akses Pengaturan"
+                    ),
+                    React.createElement("form", { onSubmit: handleLogin, className: "space-y-4" },
+                        React.createElement("div", null,
+                            React.createElement("label", { className: "block text-sm font-bold text-slate-500 mb-1" }, "Username"),
+                            React.createElement("input", { 
+                                type: "text", 
+                                className: "w-full p-2 border rounded-lg",
+                                value: loginData.username,
+                                onChange: e => setLoginData({...loginData, username: e.target.value})
+                            })
+                        ),
+                        React.createElement("div", null,
+                            React.createElement("label", { className: "block text-sm font-bold text-slate-500 mb-1" }, "Password"),
+                            React.createElement("input", { 
+                                type: "password", 
+                                className: "w-full p-2 border rounded-lg",
+                                value: loginData.password,
+                                onChange: e => setLoginData({...loginData, password: e.target.value})
+                            })
+                        ),
+                        React.createElement("button", { className: "w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700" }, "Masuk")
+                    )
+                );
+            }
 
             const saveSettings = async () => {
                 setLoading(true);
