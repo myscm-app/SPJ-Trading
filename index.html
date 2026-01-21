@@ -300,7 +300,9 @@
 --------------------------------
 1. ${data.itemName}
    📦 ${data.qty} ${data.uom}
-${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
+${data.notes ? `   📝 Ket: ${data.notes}` : ''}
+
+> _Sent via fonnte.com_`;
 
                 const groups = waConfig.targetGroups.split(',').map(g => g.trim()).filter(g => g);
 
@@ -391,7 +393,9 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
                                         setFormData({
                                             ...formData, 
                                             itemId: selectedItemId,
-                                            uom: selectedItem ? selectedItem.uom : '' 
+                                            uom: selectedItem ? selectedItem.uom : '',
+                                            // LOGIC OTOMATIS ISI KETERANGAN
+                                            notes: selectedItem ? (selectedItem.notes || '') : ''
                                         });
                                     }
                                 },
@@ -705,7 +709,7 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
         };
 
         const MasterItemForm = ({ user }) => {
-            const [formData, setFormData] = useState({ name: '', uom: 'PCS' });
+            const [formData, setFormData] = useState({ name: '', uom: 'PCS', notes: '' }); // Tambahkan 'notes'
             const [items, setItems] = useState([]);
             const [editingId, setEditingId] = useState(null);
             const [editData, setEditData] = useState({});
@@ -720,7 +724,7 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'items'), { ...formData, createdAt: serverTimestamp() });
-                setFormData({ name: '', uom: 'PCS' });
+                setFormData({ name: '', uom: 'PCS', notes: '' }); // Reset 'notes'
             };
 
             const startEdit = (item) => {
@@ -732,7 +736,8 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
                 try {
                     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'items', editingId), {
                         name: editData.name,
-                        uom: editData.uom
+                        uom: editData.uom,
+                        notes: editData.notes || '' // Simpan 'notes'
                     });
                     setEditingId(null);
                 } catch (err) {
@@ -753,6 +758,7 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
                     React.createElement("form", { onSubmit: handleSubmit, className: "space-y-3" },
                         React.createElement("input", { required: true, placeholder: "Nama Barang", className: "w-full p-2 border rounded-lg", value: formData.name, onChange: e => setFormData({...formData, name: e.target.value}) }),
                         React.createElement("input", { required: true, placeholder: "Satuan Dasar (PCS/KG/Ltr)", className: "w-full p-2 border rounded-lg", value: formData.uom, onChange: e => setFormData({...formData, uom: e.target.value}) }),
+                        React.createElement("textarea", { placeholder: "Keterangan Default (Opsional)", className: "w-full p-2 border rounded-lg", value: formData.notes, onChange: e => setFormData({...formData, notes: e.target.value}) }), // Input Keterangan
                         React.createElement("button", { className: "w-full bg-slate-800 text-white p-2 rounded-lg font-bold hover:bg-black transition-colors" }, "Simpan Barang")
                     )
                 ),
@@ -764,17 +770,19 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
                                 React.createElement("tr", null,
                                     React.createElement("th", { className: "p-3" }, "Nama Barang"),
                                     React.createElement("th", { className: "p-3" }, "Satuan"),
+                                    React.createElement("th", { className: "p-3" }, "Keterangan"), // Header Keterangan
                                     React.createElement("th", { className: "p-3 text-right" }, "Aksi")
                                 )
                             ),
                             React.createElement("tbody", null,
                                 items.length === 0 ? 
-                                React.createElement("tr", null, React.createElement("td", { colSpan: 3, className: "p-4 text-center text-slate-400" }, "Belum ada barang.")) :
+                                React.createElement("tr", null, React.createElement("td", { colSpan: 4, className: "p-4 text-center text-slate-400" }, "Belum ada barang.")) :
                                 items.map(i => 
                                     editingId === i.id ?
                                     React.createElement("tr", { key: i.id, className: "border-b bg-blue-50" },
                                         React.createElement("td", { className: "p-2" }, React.createElement("input", { className: "w-full p-1 border rounded", value: editData.name, onChange: e => setEditData({...editData, name: e.target.value}) })),
                                         React.createElement("td", { className: "p-2" }, React.createElement("input", { className: "w-full p-1 border rounded", value: editData.uom, onChange: e => setEditData({...editData, uom: e.target.value}) })),
+                                        React.createElement("td", { className: "p-2" }, React.createElement("input", { className: "w-full p-1 border rounded", value: editData.notes, onChange: e => setEditData({...editData, notes: e.target.value}) })), // Edit Keterangan
                                         React.createElement("td", { className: "p-2 text-right flex justify-end gap-2" },
                                             React.createElement("button", { onClick: saveEdit, className: "p-1 bg-green-500 text-white rounded" }, React.createElement(CheckCircle, { size: 16 })),
                                             React.createElement("button", { onClick: () => setEditingId(null), className: "p-1 bg-red-400 text-white rounded" }, React.createElement(X, { size: 16 }))
@@ -783,6 +791,7 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
                                     React.createElement("tr", { key: i.id, className: "border-b hover:bg-slate-50" },
                                         React.createElement("td", { className: "p-3 font-bold" }, i.name),
                                         React.createElement("td", { className: "p-3" }, i.uom),
+                                        React.createElement("td", { className: "p-3 italic text-slate-500" }, i.notes || '-'), // Display Keterangan
                                         React.createElement("td", { className: "p-3 text-right flex justify-end gap-2" },
                                             React.createElement("button", { onClick: () => startEdit(i), className: "text-blue-500 hover:text-blue-700" }, React.createElement(Pencil, { size: 16 })),
                                             React.createElement("button", { onClick: () => deleteItem(i.id), className: "text-red-400 hover:text-red-600" }, React.createElement(Trash2, { size: 16 }))
@@ -1072,10 +1081,7 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
             );
         };
 
-        // --- KOMPONEN UTAMA (APP) ---
-        // Didefinisikan TERAKHIR untuk memastikan semua komponen anak sudah ada
-
-        function App() {
+        const App = () => {
             const [user, setUser] = useState(null);
             const [view, setView] = useState('transaction'); 
             const [loading, setLoading] = useState(true);
@@ -1168,7 +1174,7 @@ ${data.notes ? `   📝 Ket: ${data.notes}` : ''}`;
                     )
                 )
             );
-        }
+        };
 
         const root = createRoot(document.getElementById('root'));
         root.render(React.createElement(App));
