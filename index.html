@@ -3,12 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logistik Tracker - Surat Jalan</title>
+    <title>My Trading - Manajemen Transaksi</title>
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- React & ReactDOM -->
     <script type="importmap">
     {
       "imports": {
@@ -20,21 +17,38 @@
     </script>
     
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Courier+Prime&display=swap');
         body { font-family: 'Inter', sans-serif; }
         
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in {
-            animation: fadeIn 0.3s ease-out forwards;
-        }
+        .font-print { font-family: 'Courier Prime', monospace; }
 
         @media print {
-            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            @page { size: auto; margin: 0mm; }
+            body { background: white !important; }
             .no-print { display: none !important; }
+            .print-area { display: block !important; padding: 0; margin: 0; width: 100%; }
+            @page { size: auto; margin: 0mm; }
+            
+            .spj-blanko-data {
+                position: relative;
+                width: 210mm; 
+                height: 140mm; 
+                padding-top: 35mm; 
+                padding-left: 10mm;
+            }
+        }
+
+        .preview-modal {
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        /* Custom scrollbar for horizontal menu on small screens */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
         }
     </style>
 </head>
@@ -42,364 +56,361 @@
     <div id="root"></div>
 
     <script type="module">
-        import React, { useState, useEffect, useMemo } from 'react';
+        import React, { useState, useEffect, useRef } from 'react';
         import { createRoot } from 'react-dom/client';
         import { 
             Truck, ClipboardList, CheckCircle, PlusCircle, User, Phone, 
             Box, Search, History, Settings, Save, AlertCircle, Users, 
-            Package, Printer, Calendar, FileText, AlignJustify, Lock 
+            Package, Printer, Calendar, FileText, X, Eye, AlignJustify, TrendingUp
         } from 'lucide-react';
         
-        // Import Firebase dari CDN
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { 
-            getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { 
-            getFirestore, collection, addDoc, query, onSnapshot, 
-            doc, updateDoc, serverTimestamp 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, onSnapshot, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        /** * Konfigurasi Firebase
-         * Saat di hosting seperti GitHub, pastikan variabel __firebase_config tersedia 
-         * atau ganti objek di bawah ini dengan konfigurasi Firebase manual jika ingin mandiri.
-         */
-        
-	const firebaseConfig = {
-  apiKey: "AIzaSyBhL4pBXzoaSkNjHWe524KQLAhd335qITs",
-  authDomain: "logistik-tracker-app.firebaseapp.com",
-  projectId: "logistik-tracker-app",
-  storageBucket: "logistik-tracker-app.firebasestorage.app",
-  messagingSenderId: "417931787688",
-  appId: "1:417931787688:web:e0dedef7fb2acfc33ab19d"
-};
-
+        const firebaseConfig = {
+            apiKey: "AIzaSyBhL4pBXzoaSkNjHWe524KQLAhd335qITs",
+            authDomain: "logistik-tracker-app.firebaseapp.com",
+            projectId: "logistik-tracker-app",
+            storageBucket: "logistik-tracker-app.firebasestorage.app",
+            messagingSenderId: "417931787688",
+            appId: "1:417931787688:web:e0dedef7fb2acfc33ab19d"
+        };
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'truck-manager-static';
+        const appId = 'my-trading-v1';
 
-        // URL Script Google Sheet (Optional)
-        const GOOGLE_SCRIPT_URL = "";
-
-        // --- Constants ---
         const TRUCK_TYPES = ['SDD', 'TRONTON', 'DUMPTRUK', 'WINGBOX', 'KONTAINER', 'BOX', 'MOBIL PRIBADI'];
 
-        // --- Main Component ---
         function App() {
             const [user, setUser] = useState(null);
             const [view, setView] = useState('transaction'); 
             const [loading, setLoading] = useState(true);
-            const [authError, setAuthError] = useState(null);
 
             useEffect(() => {
-                const initAuth = async () => {
-                    if (!firebaseConfig.apiKey) {
-                        setAuthError("Konfigurasi Firebase tidak ditemukan. Pastikan API Key sudah benar.");
-                        setLoading(false);
-                        return;
-                    }
-
-                    try {
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(auth, __initial_auth_token);
-                        } else {
-                            await signInAnonymously(auth);
-                        }
-                    } catch (error) {
-                        console.error("Auth Error:", error);
-                        setAuthError("Gagal melakukan otentikasi. Periksa koneksi atau konfigurasi.");
-                    }
-                };
-
-                initAuth();
-                const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-                    setUser(currentUser);
+                const unsubscribe = onAuthStateChanged(auth, async (u) => {
+                    if (!u) await signInAnonymously(auth);
+                    setUser(u);
                     setLoading(false);
                 });
                 return () => unsubscribe();
             }, []);
 
-            if (loading) {
-                return React.createElement('div', {className: "flex items-center justify-center h-screen bg-slate-50"}, 
-                    React.createElement('div', {className: "text-blue-600 animate-pulse font-semibold text-lg font-mono"}, "LOGISTIK_SYSTEM_LOADING...")
-                );
-            }
+            if (loading) return React.createElement('div', {className: "flex items-center justify-center h-screen bg-slate-50 font-mono text-blue-600 animate-pulse"}, "LOADING_TRADING_SYSTEM...");
 
-            if (authError) {
-                return React.createElement('div', {className: "flex flex-col items-center justify-center h-screen bg-slate-50 p-6 text-center"}, 
-                    React.createElement(AlertCircle, { size: 48, className: "text-red-500 mb-4" }),
-                    React.createElement('h2', {className: "text-xl font-bold text-slate-800 mb-2"}, "Kesalahan Sistem"),
-                    React.createElement('p', {className: "text-slate-600 max-w-md"}, authError)
-                );
-            }
-            
+            const menuItems = [
+                {v: 'transaction', i: ClipboardList, l: 'Transaksi'},
+                {v: 'history', i: History, l: 'Riwayat'},
+                {v: 'register', i: Truck, l: 'Armada'},
+                {v: 'customers', i: Users, l: 'Customer'},
+                {v: 'items', i: Package, l: 'Barang'}
+            ];
+
             return (
-                React.createElement("div", { className: "min-h-screen bg-slate-100 font-sans text-slate-800 pb-20 md:pb-0" },
-                    // Header
-                    React.createElement("header", { className: "bg-blue-700 text-white p-4 shadow-lg sticky top-0 z-10 print:hidden" },
-                        React.createElement("div", { className: "max-w-4xl mx-auto flex items-center justify-between" },
-                            React.createElement("div", { className: "flex items-center gap-2" },
-                                React.createElement(Truck, { className: "h-6 w-6" }),
-                                React.createElement("h1", { className: "text-xl font-bold tracking-tight" }, "Logistik Tracker")
-                            ),
-                            React.createElement("div", { className: "flex items-center gap-3" },
-                                React.createElement("button", { onClick: () => setView('settings'), className: "p-2 rounded-full hover:bg-blue-600 transition-colors", title: "Pengaturan" },
+                React.createElement("div", { className: "min-h-screen bg-slate-100" },
+                    // HEADER DENGAN NAVIGASI TERINTEGRASI
+                    React.createElement("header", { className: "bg-blue-800 text-white shadow-lg sticky top-0 z-20 no-print" },
+                        React.createElement("div", { className: "max-w-6xl mx-auto px-4" },
+                            React.createElement("div", { className: "flex items-center justify-between h-16" },
+                                // Logo Baru: My Trading
+                                React.createElement("div", { className: "flex items-center gap-2 shrink-0" },
+                                    React.createElement(TrendingUp, { size: 24 }),
+                                    React.createElement("h1", { className: "text-lg font-bold hidden sm:block" }, "My Trading"),
+                                    React.createElement("h1", { className: "text-lg font-bold sm:hidden" }, "MT")
+                                ),
+                                
+                                // Menu Desktop & Mobile Horizontal
+                                React.createElement("div", { className: "flex-1 flex justify-center px-4 overflow-x-auto hide-scrollbar" },
+                                    React.createElement("div", { className: "flex items-center gap-1 sm:gap-4" },
+                                        menuItems.map(item => (
+                                            React.createElement("button", { 
+                                                key: item.v, 
+                                                onClick: () => setView(item.v),
+                                                className: `flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all whitespace-nowrap ${view === item.v ? 'bg-blue-700 text-white shadow-inner' : 'text-blue-200 hover:text-white hover:bg-blue-700/50'}`
+                                            }, 
+                                                React.createElement(item.i, { size: 18 }),
+                                                React.createElement("span", { className: "text-xs font-bold uppercase" }, item.l)
+                                            )
+                                        ))
+                                    )
+                                ),
+
+                                // Settings
+                                React.createElement("button", { onClick: () => setView('settings'), className: `p-2 rounded-full transition-colors ${view === 'settings' ? 'bg-blue-700' : 'hover:bg-blue-700'}` }, 
                                     React.createElement(Settings, { size: 20 })
                                 )
                             )
                         )
                     ),
 
-                    // Main Content
-                    React.createElement("main", { className: "max-w-4xl mx-auto p-4 print:p-0" },
-                        React.createElement("div", { className: "print:hidden" },
-                            view === 'register' && React.createElement(RegisterTruckForm, { user: user }),
-                            view === 'customers' && React.createElement(MasterCustomerForm, { user: user }),
-                            view === 'items' && React.createElement(MasterItemForm, { user: user }),
-                            view === 'transaction' && React.createElement(TransactionForm, { user: user }),
-                            view === 'history' && React.createElement(TransactionHistory, { user: user }),
-                            view === 'settings' && React.createElement(SettingsPage, null)
-                        )
-                    ),
-
-                    // Navigation
-                    React.createElement("div", { className: "print:hidden" },
-                        // Desktop
-                        React.createElement("div", { className: "hidden md:flex flex-wrap justify-center gap-2 mt-6 pb-10" },
-                            React.createElement(NavButtonDesktop, { active: view === 'transaction', onClick: () => setView('transaction'), label: "Surat Jalan", icon: React.createElement(ClipboardList, { size: 18 }) }),
-                            React.createElement(NavButtonDesktop, { active: view === 'history', onClick: () => setView('history'), label: "Riwayat", icon: React.createElement(History, { size: 18 }) }),
-                            React.createElement("div", { className: "w-px bg-slate-300 mx-2 h-8 self-center" }),
-                            React.createElement(NavButtonDesktop, { active: view === 'register', onClick: () => setView('register'), label: "Truk", icon: React.createElement(Truck, { size: 18 }) }),
-                            React.createElement(NavButtonDesktop, { active: view === 'customers', onClick: () => setView('customers'), label: "Customer", icon: React.createElement(Users, { size: 18 }) }),
-                            React.createElement(NavButtonDesktop, { active: view === 'items', onClick: () => setView('items'), label: "Barang", icon: React.createElement(Package, { size: 18 }) })
-                        ),
-                        // Mobile
-                        React.createElement("nav", { className: "fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] md:hidden z-20" },
-                            React.createElement("div", { className: "flex justify-around p-2" },
-                                React.createElement(NavButtonMobile, { active: view === 'transaction', onClick: () => setView('transaction'), icon: React.createElement(ClipboardList, { size: 20 }), label: "Transaksi" }),
-                                React.createElement(NavButtonMobile, { active: view === 'history', onClick: () => setView('history'), icon: React.createElement(History, { size: 20 }), label: "Riwayat" }),
-                                React.createElement(NavButtonMobile, { active: view === 'register', onClick: () => setView('register'), icon: React.createElement(Truck, { size: 20 }), label: "Truk" }),
-                                React.createElement(NavButtonMobile, { active: view === 'customers', onClick: () => setView('customers'), icon: React.createElement(Users, { size: 20 }), label: "Cust" }),
-                                React.createElement(NavButtonMobile, { active: view === 'items', onClick: () => setView('items'), icon: React.createElement(Package, { size: 20 }), label: "Barang" })
-                            )
-                        )
+                    React.createElement("main", { className: "max-w-4xl mx-auto p-4 md:pt-8" },
+                        view === 'register' && React.createElement(RegisterTruckForm, { user }),
+                        view === 'customers' && React.createElement(MasterCustomerForm, { user }),
+                        view === 'items' && React.createElement(MasterItemForm, { user }),
+                        view === 'transaction' && React.createElement(TransactionForm, { user }),
+                        view === 'history' && React.createElement(TransactionHistory, { user }),
+                        view === 'settings' && React.createElement(SettingsPage, null)
                     )
                 )
             );
         }
 
-        const NavButtonDesktop = ({ active, onClick, label, icon }) => (
-            React.createElement("button", { onClick: onClick, className: `px-4 py-2 rounded-full flex items-center gap-2 text-sm font-medium transition-all ${active ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'}` }, icon, " ", label)
-        );
-
-        const NavButtonMobile = ({ active, onClick, icon, label }) => (
-            React.createElement("button", { onClick: onClick, className: `flex flex-col items-center p-2 rounded-lg ${active ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}` }, icon, React.createElement("span", { className: "text-[10px] mt-1 font-medium" }, label))
-        );
-
-        // --- Sub-components (Forms) ---
-
-        const MasterCustomerForm = ({ user }) => {
-            const [formData, setFormData] = useState({ name: '', address: '', phone: '' });
-            const [msg, setMsg] = useState('');
-            const handleSubmit = async (e) => {
-                e.preventDefault();
-                if (!user) return;
-                try {
-                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'customers'), { ...formData, createdAt: serverTimestamp() });
-                    setMsg('Customer disimpan!'); setFormData({ name: '', address: '', phone: '' }); setTimeout(() => setMsg(''), 3000);
-                } catch (e) { console.error(e); }
-            };
-            return React.createElement("div", { className: "bg-white rounded-xl shadow-sm border p-6 animate-fade-in" },
-                React.createElement("h2", { className: "text-lg font-bold mb-4 flex items-center gap-2" }, React.createElement(Users, { className: "text-blue-500" }), " Master Data Customer"),
-                msg && React.createElement("div", { className: "mb-4 p-2 bg-green-50 text-green-700 rounded text-sm" }, msg),
-                React.createElement("form", { onSubmit: handleSubmit, className: "space-y-4" },
-                    React.createElement("input", { required: true, type: "text", placeholder: "Nama Customer / PT", className: "w-full p-3 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none", value: formData.name, onChange: e => setFormData({...formData, name: e.target.value}) }),
-                    React.createElement("textarea", { placeholder: "Alamat Lengkap", className: "w-full p-3 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none", rows: 2, value: formData.address, onChange: e => setFormData({...formData, address: e.target.value}) }),
-                    React.createElement("input", { type: "text", placeholder: "No Telepon", className: "w-full p-3 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none", value: formData.phone, onChange: e => setFormData({...formData, phone: e.target.value}) }),
-                    React.createElement("button", { type: "submit", className: "w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-lg transition-colors shadow-md" }, "Simpan Customer")
-                )
-            );
-        };
-
-        const MasterItemForm = ({ user }) => {
-            const [formData, setFormData] = useState({ name: '', uom: 'PCS', remarks: '' });
-            const [msg, setMsg] = useState('');
-            const handleSubmit = async (e) => {
-                e.preventDefault();
-                if (!user) return;
-                try {
-                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'items'), { ...formData, createdAt: serverTimestamp() });
-                    setMsg('Barang disimpan!'); setFormData({ name: '', uom: 'PCS', remarks: '' }); setTimeout(() => setMsg(''), 3000);
-                } catch (e) { console.error(e); }
-            };
-            return React.createElement("div", { className: "bg-white rounded-xl shadow-sm border p-6 animate-fade-in" },
-                React.createElement("h2", { className: "text-lg font-bold mb-4 flex items-center gap-2" }, React.createElement(Package, { className: "text-blue-500" }), " Master Data Barang"),
-                msg && React.createElement("div", { className: "mb-4 p-2 bg-green-50 text-green-700 rounded text-sm" }, msg),
-                React.createElement("form", { onSubmit: handleSubmit, className: "space-y-4" },
-                    React.createElement("input", { required: true, type: "text", placeholder: "Nama Barang", className: "w-full p-3 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none", value: formData.name, onChange: e => setFormData({...formData, name: e.target.value}) }),
-                    React.createElement("div", { className: "grid grid-cols-2 gap-4" },
-                        React.createElement("input", { required: true, type: "text", placeholder: "Satuan (UOM)", className: "w-full p-3 bg-slate-50 border rounded-lg uppercase focus:ring-2 focus:ring-blue-500 outline-none", value: formData.uom, onChange: e => setFormData({...formData, uom: e.target.value.toUpperCase()}) }),
-                        React.createElement("input", { type: "text", placeholder: "Keterangan", className: "w-full p-3 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none", value: formData.remarks, onChange: e => setFormData({...formData, remarks: e.target.value}) })
-                    ),
-                    React.createElement("button", { type: "submit", className: "w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-lg transition-colors shadow-md" }, "Simpan Barang")
-                )
-            );
-        };
-
         const TransactionForm = ({ user }) => {
             const [trucks, setTrucks] = useState([]);
             const [customers, setCustomers] = useState([]);
             const [items, setItems] = useState([]);
-            const [activeTransactions, setActiveTransactions] = useState([]);
+            const [activeTrans, setActiveTrans] = useState([]);
+            
+            const [formData, setFormData] = useState({
+                date: new Date().toISOString().split('T')[0],
+                truckId: '',
+                customerId: '',
+                itemId: '',
+                qty: '',
+                uom: '',
+                notes: ''
+            });
 
-            const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-            const [selectedTruckId, setSelectedTruckId] = useState('');
-            const [selectedCustId, setSelectedCustId] = useState('');
-            const [selectedItemId, setSelectedItemId] = useState('');
-            const [qty, setQty] = useState('');
-            const [uom, setUom] = useState('');
-            const [notes, setNotes] = useState('');
-            const [isSubmitting, setIsSubmitting] = useState(false);
-            const [lastTransaction, setLastTransaction] = useState(null);
+            const [previewData, setPreviewData] = useState(null);
+            const [printMode, setPrintMode] = useState('full'); 
 
             useEffect(() => {
                 if (!user) return;
-                const unsubTrucks = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'trucks')), s => setTrucks(s.docs.map(d => ({id: d.id, ...d.data()}))), e => console.error(e));
-                const unsubCust = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'customers')), s => setCustomers(s.docs.map(d => ({id: d.id, ...d.data()}))), e => console.error(e));
-                const unsubItems = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'items')), s => setItems(s.docs.map(d => ({id: d.id, ...d.data()}))), e => console.error(e));
-                const unsubTrans = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'transactions')), s => {
-                    setActiveTransactions(s.docs.map(d => ({id: d.id, ...d.data()})).filter(t => t.status === 'ACTIVE'));
-                }, e => console.error(e));
-                return () => { unsubTrucks(); unsubCust(); unsubItems(); unsubTrans(); };
+                const qT = query(collection(db, 'artifacts', appId, 'public', 'data', 'trucks'));
+                const qC = query(collection(db, 'artifacts', appId, 'public', 'data', 'customers'));
+                const qI = query(collection(db, 'artifacts', appId, 'public', 'data', 'items'));
+                const qTr = query(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'));
+
+                const unsubs = [
+                    onSnapshot(qT, s => setTrucks(s.docs.map(d => ({id: d.id, ...d.data()})))),
+                    onSnapshot(qC, s => setCustomers(s.docs.map(d => ({id: d.id, ...d.data()})))),
+                    onSnapshot(qI, s => setItems(s.docs.map(d => ({id: d.id, ...d.data()})))),
+                    onSnapshot(qTr, s => setActiveTrans(s.docs.map(d => ({id: d.id, ...d.data()})).filter(t => t.status === 'ACTIVE')))
+                ];
+                return () => unsubs.forEach(u => u());
             }, [user]);
 
-            const availableTrucks = trucks.filter(truck => !activeTransactions.some(at => at.truckId === truck.id));
-
-            const handleSubmit = async (e) => {
+            const handleSubmit = (e) => {
                 e.preventDefault();
-                if (!user || !selectedTruckId) return;
-                setIsSubmitting(true);
+                const truck = trucks.find(t => t.id === formData.truckId);
+                const customer = customers.find(c => c.id === formData.customerId);
+                const item = items.find(i => i.id === formData.itemId);
 
-                const truck = trucks.find(t => t.id === selectedTruckId);
-                const customer = customers.find(c => c.id === selectedCustId);
-                const item = items.find(i => i.id === selectedItemId);
-
-                const payload = {
-                    date, truckId: selectedTruckId, nopol: truck.nopol, driver: truck.driver, type: truck.type,
-                    customerName: customer?.name || 'Manual', itemName: item?.name || 'Manual', qty, uom: uom || item?.uom, notes,
-                    status: 'ACTIVE', timestamp: serverTimestamp(), createdBy: user.uid
-                };
-
-                try {
-                    const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), payload);
-                    setLastTransaction({ ...payload, id: docRef.id });
-                    setSelectedTruckId(''); setQty(''); setNotes('');
-                } catch (error) { console.error(error); } 
-                finally { setIsSubmitting(false); }
+                setPreviewData({
+                    ...formData,
+                    nopol: truck?.nopol,
+                    driver: truck?.driver,
+                    customerName: customer?.name,
+                    customerAddress: customer?.address,
+                    itemName: item?.name,
+                    uom: formData.uom || item?.uom
+                });
             };
 
-            if (lastTransaction) {
-                return React.createElement("div", { className: "bg-white rounded-xl shadow-lg border p-8 text-center animate-fade-in" },
-                    React.createElement(CheckCircle, { size: 48, className: "text-green-500 mx-auto mb-4" }),
-                    React.createElement("h2", { className: "text-xl font-bold mb-4" }, "Berhasil Dibuat!"),
-                    React.createElement("div", { className: "flex flex-col gap-2 mb-6" },
-                        React.createElement("button", { onClick: () => window.print(), className: "bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold shadow-md transition-colors" }, "Cetak Surat Jalan"),
-                        React.createElement("button", { onClick: () => setLastTransaction(null), className: "text-blue-600 font-medium py-2 hover:underline" }, "Kembali ke Input")
+            const confirmAndSave = async () => {
+                try {
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), {
+                        ...previewData,
+                        status: 'ACTIVE',
+                        timestamp: serverTimestamp(),
+                        createdBy: user.uid
+                    });
+                    window.print();
+                    setPreviewData(null);
+                    setFormData({...formData, truckId: '', qty: '', notes: ''});
+                } catch (err) {
+                    console.error(err);
+                }
+            };
+
+            return React.createElement("div", null,
+                React.createElement("div", { className: "bg-white p-6 rounded-xl border shadow-sm no-print" },
+                    React.createElement("h2", { className: "text-lg font-bold mb-6 flex items-center gap-2 border-b pb-4" }, 
+                        React.createElement(ClipboardList, { className: "text-blue-500" }), " Buat Transaksi Baru"
                     ),
-                    // Print layout
-                    React.createElement("div", {className: "hidden print:block text-left text-black font-serif p-4"}, 
-                        React.createElement("div", {className:"border-b-4 border-double border-black pb-4 mb-6 flex justify-between items-end"}, 
-                            React.createElement("div", null, 
-                                React.createElement("h1", {className:"text-3xl font-black italic"}, "LOGISTIK EXPRESS"),
-                                React.createElement("p", {className: "text-xs"}, "Sistem Surat Jalan Digital")
+                    React.createElement("form", { onSubmit: handleSubmit, className: "space-y-4" },
+                        React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4" },
+                            React.createElement("div", null,
+                                React.createElement("label", { className: "text-xs font-bold text-slate-500" }, "TANGGAL"),
+                                React.createElement("input", { type: "date", required: true, className: "w-full p-2 border rounded-lg bg-slate-50", value: formData.date, onChange: e => setFormData({...formData, date: e.target.value}) })
                             ),
-                            React.createElement("h2", {className:"text-2xl font-bold"}, "SURAT JALAN")
-                        ),
-                        React.createElement("div", {className: "grid grid-cols-2 gap-10 mb-8"}, 
-                            React.createElement("div", null, 
-                                React.createElement("p", {className: "font-bold text-sm border-b mb-2"}, "PENGIRIM:"),
-                                React.createElement("p", {className: "text-sm"}, "Gudang Utama - Logistik Tracker")
-                            ),
-                            React.createElement("div", null, 
-                                React.createElement("p", {className: "font-bold text-sm border-b mb-2"}, "PENERIMA:"),
-                                React.createElement("p", {className: "text-sm font-bold uppercase"}, lastTransaction.customerName)
+                            React.createElement("div", null,
+                                React.createElement("label", { className: "text-xs font-bold text-slate-500" }, "TRUK / DRIVER"),
+                                React.createElement("select", { required: true, className: "w-full p-2 border rounded-lg", value: formData.truckId, onChange: e => setFormData({...formData, truckId: e.target.value}) },
+                                    React.createElement("option", { value: "" }, "- Pilih Armada -"),
+                                    trucks.filter(t => !activeTrans.some(at => at.truckId === t.id)).map(t => 
+                                        React.createElement("option", { key: t.id, value: t.id }, `${t.nopol} - ${t.driver}`)
+                                    )
+                                )
                             )
                         ),
-                        React.createElement("div", {className: "mb-8"}, 
-                            React.createElement("p", {className: "text-sm"}, "Tgl: ", React.createElement("span", {className: "font-bold"}, lastTransaction.date)),
-                            React.createElement("p", {className: "text-sm"}, "No. Kendaraan: ", React.createElement("span", {className: "font-bold"}, lastTransaction.nopol)),
-                            React.createElement("p", {className: "text-sm"}, "Sopir: ", React.createElement("span", {className: "font-bold font-mono"}, lastTransaction.driver))
-                        ),
-                        React.createElement("table", {className: "w-full border-collapse border border-black mb-10"}, 
-                           React.createElement("thead", null, 
-                                React.createElement("tr", {className: "bg-gray-100"}, 
-                                    React.createElement("th", {className: "border border-black p-2 text-left text-sm"}, "Nama Barang"),
-                                    React.createElement("th", {className: "border border-black p-2 text-center text-sm w-24"}, "Jumlah"),
-                                    React.createElement("th", {className: "border border-black p-2 text-center text-sm w-24"}, "Satuan")
+                        React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4" },
+                            React.createElement("div", null,
+                                React.createElement("label", { className: "text-xs font-bold text-slate-500" }, "TUJUAN / CUSTOMER"),
+                                React.createElement("select", { required: true, className: "w-full p-2 border rounded-lg", value: formData.customerId, onChange: e => setFormData({...formData, customerId: e.target.value}) },
+                                    React.createElement("option", { value: "" }, "- Pilih Customer -"),
+                                    customers.map(c => React.createElement("option", { key: c.id, value: c.id }, c.name))
                                 )
-                           ),
-                           React.createElement("tbody", null, 
-                                React.createElement("tr", null, 
-                                    React.createElement("td", {className: "border border-black p-2 text-sm"}, lastTransaction.itemName),
-                                    React.createElement("td", {className: "border border-black p-2 text-center text-sm"}, lastTransaction.qty),
-                                    React.createElement("td", {className: "border border-black p-2 text-center text-sm"}, lastTransaction.uom)
+                            ),
+                            React.createElement("div", null,
+                                React.createElement("label", { className: "text-xs font-bold text-slate-500" }, "BARANG"),
+                                React.createElement("select", { required: true, className: "w-full p-2 border rounded-lg", value: formData.itemId, onChange: e => setFormData({...formData, itemId: e.target.value}) },
+                                    React.createElement("option", { value: "" }, "- Pilih Barang -"),
+                                    items.map(i => React.createElement("option", { key: i.id, value: i.id }, i.name))
                                 )
-                           )
+                            )
                         ),
-                        React.createElement("div", {className: "grid grid-cols-3 gap-4 text-center text-xs mt-20"}, 
-                            React.createElement("div", null, React.createElement("p", {className: "mb-16 uppercase"}, "Pengirim"), React.createElement("div", {className: "border-b border-black w-3/4 mx-auto"}), React.createElement("p", {className: "mt-1 italic"}, "(.....................)")),
-                            React.createElement("div", null, React.createElement("p", {className: "mb-16 uppercase"}, "Sopir"), React.createElement("div", {className: "border-b border-black w-3/4 mx-auto"}), React.createElement("p", {className: "mt-1 italic"}, `(${lastTransaction.driver})`)),
-                            React.createElement("div", null, React.createElement("p", {className: "mb-16 uppercase"}, "Penerima"), React.createElement("div", {className: "border-b border-black w-3/4 mx-auto"}), React.createElement("p", {className: "mt-1 italic"}, "(.....................)"))
+                        React.createElement("div", { className: "grid grid-cols-2 gap-4" },
+                            React.createElement("div", null,
+                                React.createElement("label", { className: "text-xs font-bold text-slate-500" }, "QTY"),
+                                React.createElement("input", { type: "number", required: true, className: "w-full p-2 border rounded-lg", value: formData.qty, onChange: e => setFormData({...formData, qty: e.target.value}) })
+                            ),
+                            React.createElement("div", null,
+                                React.createElement("label", { className: "text-xs font-bold text-slate-500" }, "SATUAN (OPSIONAL)"),
+                                React.createElement("input", { type: "text", className: "w-full p-2 border rounded-lg", placeholder: "Contoh: Pallet/Box", value: formData.uom, onChange: e => setFormData({...formData, uom: e.target.value}) })
+                            )
+                        ),
+                        React.createElement("button", { type: "submit", className: "w-full bg-blue-600 text-white font-bold py-3 rounded-lg shadow hover:bg-blue-700 transition-all" }, "Preview & Cetak")
+                    )
+                ),
+
+                previewData && React.createElement("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4 preview-modal no-print" },
+                    React.createElement("div", { className: "bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" },
+                        React.createElement("div", { className: "p-4 bg-slate-800 text-white flex justify-between items-center" },
+                            React.createElement("div", { className: "flex items-center gap-2" },
+                                React.createElement(Eye, { size: 20 }),
+                                React.createElement("h3", { className: "font-bold" }, "Preview Nota Transaksi")
+                            ),
+                            React.createElement("button", { onClick: () => setPreviewData(null) }, React.createElement(X, { size: 24 }))
+                        ),
+                        React.createElement("div", { className: "p-4 bg-slate-100 border-b flex gap-4" },
+                            React.createElement("label", { className: `flex-1 p-3 rounded-xl border-2 cursor-pointer flex flex-col items-center gap-1 transition-all ${printMode === 'full' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white'}` },
+                                React.createElement("input", { type: "radio", className: "hidden", name: "pmode", checked: printMode === 'full', onChange: () => setPrintMode('full') }),
+                                React.createElement(FileText, { size: 20 }),
+                                React.createElement("span", { className: "text-xs font-bold" }, "Template Lengkap")
+                            ),
+                            React.createElement("label", { className: `flex-1 p-3 rounded-xl border-2 cursor-pointer flex flex-col items-center gap-1 transition-all ${printMode === 'data-only' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white'}` },
+                                React.createElement("input", { type: "radio", className: "hidden", name: "pmode", checked: printMode === 'data-only', onChange: () => setPrintMode('data-only') }),
+                                React.createElement(AlignJustify, { size: 20 }),
+                                React.createElement("span", { className: "text-xs font-bold" }, "Hanya Isi Data (Blangko)")
+                            )
+                        ),
+                        React.createElement("div", { className: "flex-1 overflow-auto p-8" },
+                            React.createElement("div", { className: `mx-auto border bg-white shadow-sm p-6 ${printMode === 'data-only' ? 'font-print border-dashed text-blue-500' : 'text-black'}` },
+                                printMode === 'full' ? 
+                                React.createElement("div", null,
+                                    React.createElement("div", { className: "flex justify-between border-b-2 border-black pb-2 mb-4" },
+                                        React.createElement("div", null, React.createElement("h4", { className: "font-black italic text-xl" }, "MY TRADING"), React.createElement("p", {className:"text-[10px]"}, "Professional Trading & Logistics")),
+                                        React.createElement("h4", { className: "font-bold text-lg" }, "NOTA TRANSAKSI")
+                                    ),
+                                    React.createElement("div", { className: "grid grid-cols-2 text-[11px] mb-4" },
+                                        React.createElement("div", null, React.createElement("p", null, "Kepada:"), React.createElement("p", {className:"font-bold"}, previewData.customerName), React.createElement("p", null, previewData.customerAddress)),
+                                        React.createElement("div", { className: "text-right" }, React.createElement("p", null, "Tanggal: ", previewData.date), React.createElement("p", null, "No. Polisi: ", previewData.nopol), React.createElement("p", null, "Driver: ", previewData.driver))
+                                    ),
+                                    React.createElement("table", { className: "w-full border-collapse border border-black text-xs mb-10" },
+                                        React.createElement("thead", { className: "bg-slate-100" },
+                                            React.createElement("tr", null,
+                                                React.createElement("th", {className:"border border-black p-1"}, "NAMA BARANG"),
+                                                React.createElement("th", {className:"border border-black p-1"}, "JUMLAH"),
+                                                React.createElement("th", {className:"border border-black p-1"}, "SATUAN")
+                                            )
+                                        ),
+                                        React.createElement("tbody", null,
+                                            React.createElement("tr", null,
+                                                React.createElement("td", {className:"border border-black p-1"}, previewData.itemName),
+                                                React.createElement("td", {className:"border border-black p-1 text-center font-bold text-lg"}, previewData.qty),
+                                                React.createElement("td", {className:"border border-black p-1 text-center"}, previewData.uom)
+                                            )
+                                        )
+                                    )
+                                ) : 
+                                React.createElement("div", { className: "relative min-h-[300px]" },
+                                    React.createElement("div", { className: "absolute top-0 right-0 text-right" }, 
+                                        React.createElement("p", null, previewData.date),
+                                        React.createElement("p", null, previewData.nopol)
+                                    ),
+                                    React.createElement("div", { className: "mt-10 mb-10" },
+                                        React.createElement("p", null, "Kepada Yth,"),
+                                        React.createElement("p", { className: "font-bold ml-4" }, previewData.customerName)
+                                    ),
+                                    React.createElement("div", { className: "grid grid-cols-3 gap-2 border-t border-b border-blue-200 py-2" },
+                                        React.createElement("p", null, previewData.itemName),
+                                        React.createElement("p", { className: "text-center" }, previewData.qty),
+                                        React.createElement("p", { className: "text-center" }, previewData.uom)
+                                    )
+                                )
+                            )
+                        ),
+                        React.createElement("div", { className: "p-4 bg-slate-50 flex gap-4" },
+                            React.createElement("button", { onClick: confirmAndSave, className: "flex-1 bg-green-600 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2" }, 
+                                React.createElement(Printer, { size: 18 }), "KONFIRMASI & CETAK"
+                            )
                         )
                     )
-                );
-            }
+                ),
 
-            return React.createElement("div", { className: "bg-white rounded-xl shadow-sm border p-6 animate-fade-in" },
-                React.createElement("h2", { className: "text-lg font-bold mb-6 flex items-center gap-2 border-b pb-4" }, React.createElement(ClipboardList, { className: "text-blue-500" }), " Input Surat Jalan"),
-                React.createElement("form", { onSubmit: handleSubmit, className: "space-y-6" },
-                    React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4" },
-                        React.createElement("div", null,
-                            React.createElement("label", { className: "block text-xs font-bold text-slate-500 mb-1" }, "TANGGAL"),
-                            React.createElement("input", { type: "date", required: true, className: "w-full p-3 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none", value: date, onChange: e => setDate(e.target.value) })
+                previewData && React.createElement("div", { className: "hidden print:block print-area" },
+                    printMode === 'full' ? 
+                    React.createElement("div", { className: "p-10 text-black h-screen" },
+                        React.createElement("div", { className: "flex justify-between border-b-4 border-double border-black pb-4 mb-6" },
+                            React.createElement("div", null, 
+                                React.createElement("h1", { className: "text-3xl font-black italic" }, "MY TRADING"),
+                                React.createElement("p", { className: "text-xs" }, "Sistem Manajemen Perdagangan Digital")
+                            ),
+                            React.createElement("h2", { className: "text-2xl font-bold self-end" }, "NOTA TRANSAKSI")
                         ),
-                        React.createElement("div", null,
-                            React.createElement("label", { className: "block text-xs font-bold text-slate-500 mb-1" }, "PILIH TRUK"),
-                            React.createElement("select", { required: true, className: "w-full p-3 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none", value: selectedTruckId, onChange: e => setSelectedTruckId(e.target.value) },
-                                React.createElement("option", { value: "" }, "-- Pilih Truk --"),
-                                availableTrucks.map(t => React.createElement("option", { key: t.id, value: t.id }, `${t.nopol} (${t.driver})`))
-                            )
-                        )
-                    ),
-                    React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4" },
-                        React.createElement("div", null,
-                            React.createElement("label", { className: "block text-xs font-bold text-slate-500 mb-1" }, "CUSTOMER"),
-                            React.createElement("select", { required: true, className: "w-full p-3 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none", value: selectedCustId, onChange: e => setSelectedCustId(e.target.value) },
-                                React.createElement("option", { value: "" }, "-- Pilih Customer --"),
-                                customers.map(c => React.createElement("option", { key: c.id, value: c.id }, c.name))
+                        React.createElement("div", { className: "grid grid-cols-2 mb-8 gap-10" },
+                            React.createElement("div", null, 
+                                React.createElement("p", { className: "text-sm border-b mb-1 font-bold" }, "PENERIMA:"),
+                                React.createElement("p", { className: "text-lg font-bold" }, previewData.customerName),
+                                React.createElement("p", { className: "text-sm leading-tight" }, previewData.customerAddress)
+                            ),
+                            React.createElement("div", { className: "text-right space-y-1" },
+                                React.createElement("p", null, "Tanggal: ", React.createElement("span", {className:"font-bold"}, previewData.date)),
+                                React.createElement("p", null, "No. Kendaraan: ", React.createElement("span", {className:"font-bold"}, previewData.nopol)),
+                                React.createElement("p", null, "Sopir: ", React.createElement("span", {className:"font-bold"}, previewData.driver))
                             )
                         ),
-                        React.createElement("div", null,
-                            React.createElement("label", { className: "block text-xs font-bold text-slate-500 mb-1" }, "BARANG"),
-                            React.createElement("select", { required: true, className: "w-full p-3 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none", value: selectedItemId, onChange: e => setSelectedItemId(e.target.value) },
-                                React.createElement("option", { value: "" }, "-- Pilih Barang --"),
-                                items.map(i => React.createElement("option", { key: i.id, value: i.id }, i.name))
+                        React.createElement("table", { className: "w-full border-collapse border border-black mb-12" },
+                            React.createElement("thead", null,
+                                React.createElement("tr", { className: "bg-gray-100" },
+                                    React.createElement("th", { className: "border border-black p-3 text-left" }, "DESKRIPSI BARANG"),
+                                    React.createElement("th", { className: "border border-black p-3 text-center w-32" }, "QTY"),
+                                    React.createElement("th", { className: "border border-black p-3 text-center w-32" }, "SATUAN")
+                                )
+                            ),
+                            React.createElement("tbody", null,
+                                React.createElement("tr", null,
+                                    React.createElement("td", { className: "border border-black p-4" }, previewData.itemName),
+                                    React.createElement("td", { className: "border border-black p-4 text-center font-bold text-2xl" }, previewData.qty),
+                                    React.createElement("td", { className: "border border-black p-4 text-center" }, previewData.uom)
+                                )
                             )
-                        )
-                    ),
-                    React.createElement("div", { className: "grid grid-cols-2 gap-4" },
-                        React.createElement("div", null,
-                            React.createElement("label", { className: "block text-xs font-bold text-slate-500 mb-1" }, "JUMLAH"),
-                            React.createElement("input", { type: "number", required: true, placeholder: "0", className: "w-full p-3 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none", value: qty, onChange: e => setQty(e.target.value) })
                         ),
-                        React.createElement("div", null,
-                            React.createElement("label", { className: "block text-xs font-bold text-slate-500 mb-1" }, "SATUAN"),
-                            React.createElement("input", { type: "text", placeholder: "Satuan", className: "w-full p-3 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none", value: uom, onChange: e => setUom(e.target.value) })
+                        React.createElement("div", { className: "grid grid-cols-3 text-center text-xs mt-20" },
+                            ['Hormat Kami', 'Sopir', 'Penerima'].map(pos => (
+                                React.createElement("div", { key: pos }, 
+                                    React.createElement("p", { className: "mb-20 uppercase font-bold" }, pos),
+                                    React.createElement("div", { className: "border-b border-black w-2/3 mx-auto" }),
+                                    React.createElement("p", { className: "mt-1 italic" }, pos === 'Sopir' ? `(${previewData.driver})` : '(....................)')
+                                )
+                            ))
                         )
-                    ),
-                    React.createElement("button", { type: "submit", disabled: isSubmitting, className: "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-lg shadow-lg disabled:opacity-50 transition-all transform active:scale-[0.98]" }, isSubmitting ? 'Menyimpan...' : 'Simpan & Cetak')
+                    ) : 
+                    React.createElement("div", { className: "spj-blanko-data font-print text-lg text-black" },
+                        React.createElement("div", { style: { position: 'absolute', top: '35mm', left: '140mm' } }, previewData.date),
+                        React.createElement("div", { style: { position: 'absolute', top: '42mm', left: '140mm' } }, previewData.nopol),
+                        React.createElement("div", { style: { position: 'absolute', top: '55mm', left: '20mm', fontWeight: 'bold' } }, previewData.customerName),
+                        React.createElement("div", { style: { position: 'absolute', top: '62mm', left: '20mm', fontSize: '12px', width: '80mm' } }, previewData.customerAddress),
+                        
+                        React.createElement("div", { style: { position: 'absolute', top: '85mm', left: '15mm' } }, previewData.itemName),
+                        React.createElement("div", { style: { position: 'absolute', top: '85mm', left: '100mm', fontWeight: 'bold' } }, previewData.qty),
+                        React.createElement("div", { style: { position: 'absolute', top: '85mm', left: '130mm' } }, previewData.uom),
+
+                        React.createElement("div", { style: { position: 'absolute', top: '125mm', left: '75mm', textAlign: 'center', width: '50mm' } }, previewData.driver)
+                    )
                 )
             );
         };
@@ -411,77 +422,94 @@
                 const unsub = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'transactions')), s => {
                     const data = s.docs.map(d => ({id: d.id, ...d.data()}));
                     setTransactions(data.sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0)));
-                }, e => console.error(e));
+                }, (err) => console.error(err));
                 return () => unsub();
             }, [user]);
 
             const handleFinish = async (id) => {
                 if(!confirm("Selesaikan transaksi ini? Armada akan kembali tersedia.")) return;
-                try {
-                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', id), { status: 'COMPLETED', completedAt: serverTimestamp() });
-                } catch (e) { console.error(e); }
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', id), { status: 'COMPLETED', completedAt: serverTimestamp() });
             };
 
-            return React.createElement("div", { className: "space-y-4 animate-fade-in" },
-                React.createElement("h2", { className: "font-bold text-lg flex gap-2 items-center" }, React.createElement(History, { className: "text-blue-500" }), " Riwayat Transaksi"),
-                transactions.length === 0 && React.createElement("p", {className: "text-slate-400 text-center py-10 italic border-2 border-dashed rounded-lg"}, "Belum ada riwayat transaksi."),
-                transactions.map(t => React.createElement("div", { key: t.id, className: `bg-white p-4 rounded-lg border shadow-sm transition-all hover:shadow-md ${t.status === 'ACTIVE' ? 'border-l-4 border-l-orange-500' : 'opacity-70 grayscale-[0.5]'}` },
-                    React.createElement("div", { className: "flex justify-between items-start" },
+            return React.createElement("div", { className: "space-y-3 no-print" },
+                React.createElement("h2", { className: "font-bold text-lg flex gap-2 items-center" }, React.createElement(History, { className: "text-blue-500" }), " Log Perjalanan / Transaksi"),
+                transactions.length === 0 ? 
+                    React.createElement("p", {className: "text-center text-slate-400 py-10"}, "Belum ada riwayat transaksi.") :
+                    transactions.map(t => React.createElement("div", { key: t.id, className: `bg-white p-4 rounded-xl border shadow-sm flex justify-between items-center ${t.status === 'ACTIVE' ? 'border-l-4 border-l-orange-500' : 'opacity-60'}` },
                         React.createElement("div", null,
-                            React.createElement("div", { className: "font-bold text-lg leading-tight" }, t.nopol),
-                            React.createElement("div", { className: "text-sm text-slate-600 font-medium" }, t.customerName),
-                            React.createElement("div", { className: "text-xs text-blue-600 font-mono" }, t.itemName, " (", t.qty, " ", t.uom, ")"),
-                            React.createElement("div", { className: "text-[10px] mt-1 text-slate-400 flex items-center gap-1" }, React.createElement(Calendar, {size: 10}), t.date)
+                            React.createElement("p", { className: "font-black text-lg" }, t.nopol),
+                            React.createElement("p", { className: "text-sm font-bold text-slate-600" }, t.customerName),
+                            React.createElement("p", { className: "text-xs text-blue-600" }, t.itemName, " - ", t.qty, " ", t.uom)
                         ),
-                        t.status === 'ACTIVE' ? 
-                        React.createElement("button", { onClick: () => handleFinish(t.id), className: "bg-orange-500 hover:bg-orange-600 text-white text-xs px-3 py-2 rounded-lg font-bold shadow-sm" }, "Selesai") :
-                        React.createElement("div", {className: "bg-slate-100 text-slate-500 text-[10px] px-2 py-1 rounded font-bold"}, "COMPLETED")
-                    )
-                ))
+                        t.status === 'ACTIVE' && React.createElement("button", { onClick: () => handleFinish(t.id), className: "bg-orange-500 text-white text-xs px-4 py-2 rounded-lg font-bold hover:bg-orange-600 transition-colors" }, "SELESAI")
+                    ))
+            );
+        };
+
+        const MasterCustomerForm = ({ user }) => {
+            const [formData, setFormData] = useState({ name: '', address: '', phone: '' });
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'customers'), { ...formData, createdAt: serverTimestamp() });
+                setFormData({ name: '', address: '', phone: '' });
+            };
+            return React.createElement("div", { className: "bg-white p-6 rounded-xl border no-print" },
+                React.createElement("h2", { className: "font-bold mb-4 flex gap-2 items-center" }, React.createElement(Users, { className: "text-blue-500" }), " Data Customer"),
+                React.createElement("form", { onSubmit: handleSubmit, className: "space-y-3" },
+                    React.createElement("input", { required: true, placeholder: "Nama Perusahaan / Toko", className: "w-full p-2 border rounded-lg", value: formData.name, onChange: e => setFormData({...formData, name: e.target.value}) }),
+                    React.createElement("textarea", { placeholder: "Alamat Lengkap", className: "w-full p-2 border rounded-lg", value: formData.address, onChange: e => setFormData({...formData, address: e.target.value}) }),
+                    React.createElement("button", { className: "w-full bg-slate-800 text-white p-2 rounded-lg font-bold hover:bg-black transition-colors" }, "Simpan Customer")
+                )
+            );
+        };
+
+        const MasterItemForm = ({ user }) => {
+            const [formData, setFormData] = useState({ name: '', uom: 'PCS' });
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'items'), { ...formData, createdAt: serverTimestamp() });
+                setFormData({ name: '', uom: 'PCS' });
+            };
+            return React.createElement("div", { className: "bg-white p-6 rounded-xl border no-print" },
+                React.createElement("h2", { className: "font-bold mb-4 flex gap-2 items-center" }, React.createElement(Package, { className: "text-blue-500" }), " Data Barang Dagangan"),
+                React.createElement("form", { onSubmit: handleSubmit, className: "space-y-3" },
+                    React.createElement("input", { required: true, placeholder: "Nama Barang", className: "w-full p-2 border rounded-lg", value: formData.name, onChange: e => setFormData({...formData, name: e.target.value}) }),
+                    React.createElement("input", { required: true, placeholder: "Satuan Dasar (PCS/KG/Ltr)", className: "w-full p-2 border rounded-lg", value: formData.uom, onChange: e => setFormData({...formData, uom: e.target.value}) }),
+                    React.createElement("button", { className: "w-full bg-slate-800 text-white p-2 rounded-lg font-bold hover:bg-black transition-colors" }, "Simpan Barang")
+                )
             );
         };
 
         const RegisterTruckForm = ({ user }) => {
-            const [formData, setFormData] = useState({ nopol: '', driver: '', phone: '', type: 'SDD' });
-            const [msg, setMsg] = useState('');
+            const [formData, setFormData] = useState({ nopol: '', driver: '', type: 'SDD' });
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                if (!user) return;
-                try {
-                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'trucks'), { ...formData, nopol: formData.nopol.toUpperCase(), createdAt: serverTimestamp() });
-                    setMsg("Truk berhasil didaftarkan!"); 
-                    setFormData({ nopol: '', driver: '', phone: '', type: 'SDD' });
-                    setTimeout(() => setMsg(''), 3000);
-                } catch (e) { console.error(e); }
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'trucks'), { ...formData, nopol: formData.nopol.toUpperCase(), createdAt: serverTimestamp() });
+                setFormData({ nopol: '', driver: '', type: 'SDD' });
             };
-            return React.createElement("div", { className: "bg-white p-6 rounded-xl border animate-fade-in shadow-sm" },
-                React.createElement("h2", { className: "font-bold mb-4 flex gap-2 items-center" }, React.createElement(PlusCircle, { className: "text-blue-500" }), " Registrasi Armada"),
-                msg && React.createElement("div", { className: "mb-4 p-2 bg-green-50 text-green-700 rounded text-sm font-medium" }, msg),
-                React.createElement("form", { onSubmit: handleSubmit, className: "space-y-4" },
-                    React.createElement("input", { required: true, placeholder: "No Polisi (Contoh: B 1234 ABC)", className: "w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase", value: formData.nopol, onChange: e => setFormData({...formData, nopol: e.target.value}) }),
-                    React.createElement("input", { required: true, placeholder: "Nama Lengkap Driver", className: "w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none", value: formData.driver, onChange: e => setFormData({...formData, driver: e.target.value}) }),
-                    React.createElement("select", { className: "w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none", value: formData.type, onChange: e => setFormData({...formData, type: e.target.value}) }, 
+            return React.createElement("div", { className: "bg-white p-6 rounded-xl border no-print" },
+                React.createElement("h2", { className: "font-bold mb-4 flex gap-2 items-center" }, React.createElement(PlusCircle, { className: "text-blue-500" }), " Registrasi Armada Pengiriman"),
+                React.createElement("form", { onSubmit: handleSubmit, className: "space-y-3" },
+                    React.createElement("input", { required: true, placeholder: "No Polisi", className: "w-full p-2 border rounded-lg uppercase", value: formData.nopol, onChange: e => setFormData({...formData, nopol: e.target.value}) }),
+                    React.createElement("input", { required: true, placeholder: "Nama Driver", className: "w-full p-2 border rounded-lg", value: formData.driver, onChange: e => setFormData({...formData, driver: e.target.value}) }),
+                    React.createElement("select", { className: "w-full p-2 border rounded-lg", value: formData.type, onChange: e => setFormData({...formData, type: e.target.value}) }, 
                         TRUCK_TYPES.map(t => React.createElement("option", { key: t, value: t }, t))
                     ),
-                    React.createElement("button", { className: "w-full bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-lg font-bold transition-all shadow-md" }, "Simpan Armada")
+                    React.createElement("button", { className: "w-full bg-blue-600 text-white p-2 rounded-lg font-bold hover:bg-blue-700 transition-colors" }, "Simpan Armada")
                 )
             );
         };
 
         const SettingsPage = () => {
-            return React.createElement("div", { className: "bg-white p-8 rounded-xl border text-center animate-fade-in shadow-sm" },
-                React.createElement("div", { className: "bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4" }, 
-                    React.createElement(Settings, { className: "text-slate-400", size: 40 })
-                ),
-                React.createElement("h3", {className: "font-bold text-lg"}, "Logistik Tracker"),
-                React.createElement("p", { className: "text-slate-500 text-sm mb-6" }, "Aplikasi Manajemen Surat Jalan Digital"),
-                React.createElement("div", {className: "space-y-2 mb-8"}, 
-                    React.createElement("p", { className: "text-xs text-slate-400" }, "Versi: 1.0.5-GH"),
-                    React.createElement("p", { className: "text-xs text-slate-400" }, "Database: Firebase Firestore"),
-                    React.createElement("p", { className: "text-xs text-slate-400" }, `App ID: ${appId}`)
-                ),
-                React.createElement("div", {className: "p-3 bg-blue-50 text-blue-700 text-[10px] rounded italic"}, 
-                    "Aplikasi ini menyimpan data secara cloud. Pastikan konfigurasi Firebase Anda aktif untuk sinkronisasi antar perangkat."
+            return React.createElement("div", { className: "bg-white p-8 rounded-xl border text-center no-print" },
+                React.createElement(TrendingUp, { className: "text-blue-200 mx-auto mb-4", size: 48 }),
+                React.createElement("h3", {className: "font-bold text-lg"}, "My Trading v1.0"),
+                React.createElement("p", { className: "text-slate-500 text-sm mb-6" }, "Aplikasi Manajemen Transaksi & Pengiriman"),
+                React.createElement("div", { className: "p-4 bg-blue-50 rounded-lg text-left text-xs space-y-2" },
+                    React.createElement("p", null, "• Kelola data barang dagangan dan customer dalam satu tempat."),
+                    React.createElement("p", null, "• Cetak nota transaksi atau surat jalan dengan format profesional."),
+                    React.createElement("p", null, "• Pantau armada pengiriman secara real-time."),
+                    React.createElement("p", null, "• Data tersimpan aman di sistem cloud.")
                 )
             );
         };
